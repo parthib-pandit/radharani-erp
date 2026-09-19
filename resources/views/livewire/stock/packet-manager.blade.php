@@ -1,0 +1,63 @@
+<x-layouts.app title="Packets — Radharani Jewellery">
+<div>
+    <div class="rj-serif" style="font-size:24px;margin-bottom:4px;">Packet Management</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:24px;">Packets group items and sit inside a box.</div>
+
+    @if (session('message'))
+        <div class="rj-flash">{{ session('message') }}</div>
+    @endif
+
+    <div class="rj-card" style="margin-bottom:24px;">
+        <div style="font-weight:700;font-size:14px;margin-bottom:14px;">{{ $editingId ? 'Edit Packet' : 'New Packet' }}</div>
+        <form wire:submit="save" style="display:flex;flex-wrap:wrap;gap:14px;align-items:end;">
+            <div>
+                <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;">Code</label>
+                <input type="text" wire:model="code" class="rj-input">
+                @error('code') <div style="color:#B04A3C;font-size:11px;margin-top:3px;">{{ $message }}</div> @enderror
+            </div>
+            <div>
+                <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;">Label</label>
+                <input type="text" wire:model="label" class="rj-input">
+            </div>
+            <div>
+                <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;">Box</label>
+                <select wire:model="box_id" class="rj-select">
+                    <option value="">— none —</option>
+                    @foreach ($boxes as $box)
+                        <option value="{{ $box->id }}">{{ $box->code }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <button type="submit" class="rj-btn-primary">Save</button>
+            @if ($editingId)
+                <button type="button" wire:click="cancel" class="rj-btn-secondary">Cancel</button>
+            @endif
+        </form>
+    </div>
+
+    <input type="text" wire:model.live.debounce.300ms="search" placeholder="Search packets..."
+        class="rj-input" style="margin-bottom:14px;width:280px;">
+
+    <div class="rj-card" style="padding:0;overflow:hidden;">
+        <table class="rj-table">
+            <thead>
+                <tr><th style="padding-left:20px;">Code</th><th>Box</th><th># Items</th><th style="padding-right:20px;"></th></tr>
+            </thead>
+            <tbody>
+                @foreach ($packets as $packet)
+                    <tr>
+                        <td style="padding-left:20px;font-weight:600;">{{ $packet->code }}</td>
+                        <td>{{ $packet->box?->code ?? '—' }}</td>
+                        <td>{{ $packet->items_count }}</td>
+                        <td style="padding-right:20px;text-align:right;">
+                            <button wire:click="edit({{ $packet->id }})" style="background:none;border:none;color:var(--accent);font-weight:700;font-size:12.5px;cursor:pointer;">Edit</button>
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+
+    <div style="margin-top:16px;">{{ $packets->links() }}</div>
+</div>
+</x-layouts.app>

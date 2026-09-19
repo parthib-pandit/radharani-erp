@@ -1,58 +1,149 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Radharani Jewellery ERP
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Internal stock-management ERP + read-only ecommerce catalog for a jewellery shop. See `DEVELOPER_GUIDE.md` for system design, schema, and reasoning before making structural changes.
 
-## About Laravel
+## Stack
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+Laravel 11 · Blade + Livewire · MySQL 8+ · Database-driven queue · Local disk (WebP) storage · Hostinger shared hosting (SSH + cron)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
-
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## First-Time Setup (local)
 
 ```bash
-composer require laravel/boost --dev
+git clone https://github.com/pilgrimsage/radharani-erp.git
+cd radharani-erp
 
-php artisan boost:install
+composer install
+composer require livewire/livewire spatie/laravel-permission spatie/laravel-activitylog intervention/image
+
+cp .env.example .env
+php artisan key:generate
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+**Edit `.env`:**
+```
+DB_CONNECTION=mysql
+DB_DATABASE=radharani_erp
+DB_USERNAME=root
+DB_PASSWORD=
 
-## Contributing
+QUEUE_CONNECTION=database
+FILESYSTEM_DISK=public
+SERVICES_RATE_API_URL=
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+**Publish package migrations:**
+```bash
+php artisan vendor:publish --provider="Spatie\Permission\PermissionServiceProvider"
+php artisan vendor:publish --provider="Spatie\Activitylog\ActivitylogServiceProvider" --tag="activitylog-migrations"
+```
 
-## Code of Conduct
+**Wire routes** — confirm these two lines exist at the end of `routes/web.php`:
+```php
+require __DIR__.'/stock.php';
+require __DIR__.'/wireframes.php';
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+**Migrate and run:**
+```bash
+php artisan storage:link
+php artisan migrate
+php artisan serve
+```
 
-## Security Vulnerabilities
+Visit `/wireframes` for the static approved screens, `/stock/items` for the live Stock module.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Folder Structure
 
-## License
+```
+app/
+  Models/
+    Stock/       Item, Packet, Box
+    Movement/    Movement, RateLog
+    Sales/       Sale
+    Purchase/    Purchase, Vendor
+    Accounting/  Account, Transaction
+    Customer/    Customer, LoyaltyTransaction, InstallmentScheme, InstallmentPayment
+    User.php, Employee.php
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+  Services/
+    PricingService.php           -- live price calculation, never stored
+    PhotoCompressionService.php  -- WebP compression on every upload
+    RateFetchService.php         -- daily rate API pull + manual fallback
+
+  Livewire/
+    Stock/       BoxManager, PacketManager, ItemManager  -- live, built
+
+  Console/Commands/
+    CleanupOldPhotos.php   -- daily, deletes movement photos >90 days
+    FetchDailyRate.php     -- daily, pulls gold/silver rate
+    CheckDiskUsage.php     -- daily, alerts if disk >80%
+
+resources/views/
+  components/layouts/app.blade.php   -- shared sidebar layout, matches approved wireframe style
+  livewire/stock/                    -- live Stock module views
+  wireframes/                        -- all 13 client-approved screens, static, view-only
+
+routes/
+  web.php         -- requires stock.php and wireframes.php
+  stock.php       -- live Stock module routes
+  wireframes.php  -- static wireframe routes
+  console.php     -- scheduler definitions (queue:work, cleanup, rate fetch, disk check)
+```
+
+## Git Workflow
+
+```
+main        -- production, protected, deploy-only
+staging     -- pre-release testing (mirrors hosting env)
+feature/*   -- one branch per module/feature, short-lived
+```
+
+- No direct pushes to `main`.
+- Branch → PR → review → merge to `staging` → test on staging subdomain → merge to `main`.
+- Tag every production release (`v1.0`, `v1.1`, ...) — makes rollback trivial on shared hosting where there's no easy infrastructure-level rollback.
+
+**Commit messages:** reference the module (`stock:`, `movements:`, `sales:`) so history stays scannable as the app grows.
+
+## Deployment (Hostinger — SSH + cron only, no CI server)
+
+```bash
+#!/bin/bash
+# deploy.sh — run via SSH on the server
+git pull origin main
+composer install --no-dev --optimize-autoloader
+php artisan migrate --force
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+php artisan queue:restart
+```
+
+- `.env` is **not** in git — maintained manually per environment.
+- Never run `migrate:fresh` in production — only `migrate`.
+- `config:cache` / `route:cache` matter more here — shared hosting has weaker CPU, caching saves real latency.
+
+**Server cron — one line only, everything else is handled by Laravel's scheduler:**
+```
+* * * * * php /home/USERNAME/domains/YOURDOMAIN/public_html/artisan schedule:run >> /dev/null 2>&1
+```
+
+**Optional:** a GitHub Actions workflow that SSHs in and runs `deploy.sh` on push to `main` removes the manual SSH step — free tier covers this.
+
+## Staging
+
+Use a subdomain (`staging.yourdomain.com`) on the same hosting, separate database. Test every migration and integration (rate API, WhatsApp) here before touching production — there's no fast rollback on shared hosting, so staging is the safety net.
+
+## Current Module Status
+
+| Module | Status |
+|---|---|
+| Stock (Box/Packet/Item) | ✅ Live, Livewire |
+| Wireframes (all 13 screens) | ✅ Static reference only |
+| Movements | ⬜ Not built |
+| Sales / Billing | ⬜ Not built |
+| Purchases / Vendors | ⬜ Not built |
+| Accounting Ledger | ⬜ Not built |
+| Customer / Loyalty / Installments | ⬜ Not built |
+| Dashboard / History / Logbook / Reports | ⬜ Not built |
+
+Build order and reasoning for each: see `DEVELOPER_GUIDE.md`, Section 4.

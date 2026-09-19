@@ -19,4 +19,5 @@ Route::middleware('auth')->group(function () {
 
 require __DIR__.'/auth.php';
 
+require __DIR__.'/wireframes.php';require __DIR__.'/stock.php';
 require __DIR__.'/wireframes.php';

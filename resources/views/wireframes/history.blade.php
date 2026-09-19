@@ -77,7 +77,7 @@ button{font-family:inherit;cursor:pointer;}
     <div style="margin-top:auto;padding:16px 20px;border-top:1px solid #2A241E;display:flex;align-items:center;gap:10px;">
       <div style="width:30px;height:30px;border-radius:50%;background:#3A322A;display:flex;align-items:center;justify-content:center;color:#D9CEBE;font-size:12px;font-weight:600;">AN</div>
       <div>
-        <div style="font-size:12.5px;color:#F0EAE0;font-weight:600;">Anirudha</div>
+        <div style="font-size:12.5px;color:#F0EAE0;font-weight:600;">EchoCrew</div>
         <div style="font-size:10.5px;color:#8B7F6F;">Owner</div>
       </div>
     </div>

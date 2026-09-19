@@ -98,7 +98,7 @@ a{color:inherit;text-decoration:none;}
 
   <div style="margin-top:56px;padding-top:20px;border-top:1px solid #E7E0D4;display:flex;align-items:center;gap:10px;">
     <div style="width:28px;height:28px;border-radius:50%;background:#3A322A;display:flex;align-items:center;justify-content:center;color:#D9CEBE;font-size:11px;font-weight:600;">AN</div>
-    <div style="font-size:12px;color:#8B7F6F;">Anirudha — Owner</div>
+    <div style="font-size:12px;color:#8B7F6F;">EchoCrew — Owner</div>
   </div>
 </div>
 </body>
