@@ -32,7 +32,9 @@ Everything in the schema serves one of these goals:
 
 ---
 
-## 3. Schema, Table by Table
+## 3. Schema — Full Reference
+
+The complete, current schema (all 23 migrations, every column, every relationship) lives in **`SCHEMA_REFERENCE.md`**, including two ER diagrams — read that alongside this section. What follows here is the *reasoning* behind the non-obvious decisions; the reference doc is the source of truth for exact columns.
 
 ### Stock Hierarchy — `boxes`, `packets`, `items`
 
@@ -83,9 +85,15 @@ Separate from `movements` on purpose. **Movements answer "where is it physically
 
 **Why roles/permissions instead of a flat enum:** a flat `role` column can't express "this accountant can approve sales but not edit rates." Spatie's package gives configurable per-role permissions without a schema change every time a new role is needed.
 
-### Customer features — `customers`, `loyalty_transactions`, `installment_schemes`, `installment_payments`
+### Customer features — `customers`, `loyalty_transactions`, `installment_schemes`, `installment_payments`, `loyalty_settings`
 
 Loyalty is a ledger (`loyalty_transactions`), not a running counter, for the same audit reason as movements — any dispute is answerable from history, not just a trusted total. Installments split scheme (the plan) from payments (each actual payment) so partial/late payments are traceable and a 12th-month bonus can be triggered from real payment history.
+
+**Why `loyalty_settings` is a table, not config values in code:** points-per-rupee and the referral bonus are business decisions the owner needs to tune without a developer redeploying anything. It's a deliberately single-row table (`LoyaltySetting::current()` is the only access pattern) — one place to change the rate, immediately live everywhere `LoyaltyService` is called.
+
+**Referral bonus timing:** paid to the referrer only on the referred customer's *first confirmed sale*, not at signup — otherwise the bonus is gameable by creating empty accounts. The owner-facing `ReferralOverview` screen shows exactly which referrals are still "pending first purchase" vs. "bonus earned," so this isn't a black box.
+
+**Customer portal auth is fully separate** from staff auth — see Section 3 of `SCHEMA_REFERENCE.md`. A customer logs in with phone+password on the `customer` guard and can never reach staff-only routes; the two tables (`users` vs `customers`) are never merged.
 
 ### Activity Log — via `spatie/laravel-activitylog`
 
@@ -96,20 +104,21 @@ Every write to `movements`, `sales`, `purchases` is attributed to an authenticat
 ## 4. The Scaffold — What's Actually Built vs. What's Next
 
 **Built:**
-- All 21+ migrations (schema above, fully in place)
-- Models, organized by domain folder (`app/Models/Stock/`, `Movement/`, `Sales/`, `Purchase/`, `Accounting/`, `Customer/`)
-- `PricingService`, `PhotoCompressionService`, `RateFetchService`
+- All 23 migrations (schema in `SCHEMA_REFERENCE.md`, fully in place)
+- Models, organized by domain folder (`app/Models/Stock/`, `Movement/`, `Sales/`, `Purchase/`, `Accounting/`, `Customer/`, `Pricing/`)
+- `PricingService` (with discount rules applied), `PhotoCompressionService`, `RateFetchService`, `LoyaltyService`
 - 3 scheduled console commands (photo cleanup, rate fetch, disk usage alert) — all wired through `routes/console.php` so a single cron entry drives everything
-- **Stock module**, fully live: `BoxManager`, `PacketManager`, `ItemManager` Livewire components with real CRUD, validation, search/filter — styled to match the approved wireframes
-- **Wireframes**, static: all 13 client-approved screens converted to Blade views under `resources/views/wireframes/`, served at `/wireframes`, internal links working, zero backend logic — these are reference/approval artifacts, not live features
+- **Stock module**, fully live: `BoxManager`, `PacketManager`, `ItemManager`
+- **Admin module**, fully live: `EmployeeManager`, `UserManager`, `RoleManager`, `LoyaltySettingsManager`, `ReferralOverview`
+- **Customer portal**, fully live: phone+password login, dashboard with Purchases/Loyalty/Installments tabs, referral list
+- **Wireframes**, static: all 13 client-approved screens, reference-only, no logic
 
 **Not built yet — build in this order, each depends on the last:**
 1. **Movements module** — live version of KarigarDispatch, KarigarReturn, ExternalMovement, MoveStock, ScanStock. Depends on Stock (done).
-2. **Sales module** — live version of the billing screen, GST invoice generation. Depends on Movements (for item status) and Pricing (done).
+2. **Sales module** — live billing screen, GST invoice generation. This is also where `LoyaltyService::awardForSale()` gets wired in and where the manual `sales.discount` stacks on top of automatic `discount_rules`. Depends on Movements (for item status).
 3. **Purchases + Vendor module**
 4. **Accounting ledger wiring** — auto-write `transactions` rows from Sales/Purchases
-5. **Customer features** — loyalty, installments, referral
-6. **Dashboard, History, Logbook, Location Report** — these are mostly read-only aggregation views over Movements + Items, build last since they depend on everything else having real data
+5. **Dashboard, History, Logbook, Location Report, Audit Log viewer** — mostly read-only aggregation views, build last since they depend on everything else having real data
 
 **Why this order:** every later module reads from Items and Movements. Building Sales before Movements works exist would mean faking "current item status," which then needs rework once Movements is real.
 

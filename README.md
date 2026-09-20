@@ -1,149 +1,156 @@
-# Radharani Jewellery ERP
+# Radharani Jewellery ERP — Scaffold
 
-Internal stock-management ERP + read-only ecommerce catalog for a jewellery shop. See `DEVELOPER_GUIDE.md` for system design, schema, and reasoning before making structural changes.
+These files can't be composer-installed in this sandbox (no packagist access here),
+so set up the base Laravel project on your own machine, then drop these files in.
 
-## Stack
-
-Laravel 11 · Blade + Livewire · MySQL 8+ · Database-driven queue · Local disk (WebP) storage · Hostinger shared hosting (SSH + cron)
-
-## First-Time Setup (local)
+## Setup (run on your local machine, not this sandbox)
 
 ```bash
-git clone https://github.com/pilgrimsage/radharani-erp.git
+composer create-project laravel/laravel radharani-erp
 cd radharani-erp
 
-composer install
-composer require livewire/livewire spatie/laravel-permission spatie/laravel-activitylog intervention/image
-
-cp .env.example .env
-php artisan key:generate
+composer require spatie/laravel-permission
+composer require spatie/laravel-activitylog
+composer require intervention/image
+composer require laravel/breeze --dev
+php artisan breeze:install blade
 ```
 
-**Edit `.env`:**
-```
-DB_CONNECTION=mysql
-DB_DATABASE=radharani_erp
-DB_USERNAME=root
-DB_PASSWORD=
+Then copy this scaffold's folders into the new project, overwriting where prompted:
+- `database/migrations/*` → merge with existing (keep Laravel's default `2014_10_12_*` files removed — this scaffold replaces the default users table)
+- `app/Models/*` → copy in full
+- `app/Services/*` → copy in full
+- `app/Console/Commands/*` → copy in full
+- `routes/console.php` → replace
 
-QUEUE_CONNECTION=database
-FILESYSTEM_DISK=public
-SERVICES_RATE_API_URL=
-```
-
-**Publish package migrations:**
 ```bash
 php artisan vendor:publish --provider="Spatie\Permission\PermissionServiceProvider"
 php artisan vendor:publish --provider="Spatie\Activitylog\ActivitylogServiceProvider" --tag="activitylog-migrations"
-```
-
-**Wire routes** — confirm these two lines exist at the end of `routes/web.php`:
-```php
-require __DIR__.'/stock.php';
-require __DIR__.'/wireframes.php';
-```
-
-**Migrate and run:**
-```bash
 php artisan storage:link
 php artisan migrate
-php artisan serve
 ```
 
-Visit `/wireframes` for the static approved screens, `/stock/items` for the live Stock module.
-
-## Folder Structure
+## .env additions needed
 
 ```
-app/
-  Models/
-    Stock/       Item, Packet, Box
-    Movement/    Movement, RateLog
-    Sales/       Sale
-    Purchase/    Purchase, Vendor
-    Accounting/  Account, Transaction
-    Customer/    Customer, LoyaltyTransaction, InstallmentScheme, InstallmentPayment
-    User.php, Employee.php
-
-  Services/
-    PricingService.php           -- live price calculation, never stored
-    PhotoCompressionService.php  -- WebP compression on every upload
-    RateFetchService.php         -- daily rate API pull + manual fallback
-
-  Livewire/
-    Stock/       BoxManager, PacketManager, ItemManager  -- live, built
-
-  Console/Commands/
-    CleanupOldPhotos.php   -- daily, deletes movement photos >90 days
-    FetchDailyRate.php     -- daily, pulls gold/silver rate
-    CheckDiskUsage.php     -- daily, alerts if disk >80%
-
-resources/views/
-  components/layouts/app.blade.php   -- shared sidebar layout, matches approved wireframe style
-  livewire/stock/                    -- live Stock module views
-  wireframes/                        -- all 13 client-approved screens, static, view-only
-
-routes/
-  web.php         -- requires stock.php and wireframes.php
-  stock.php       -- live Stock module routes
-  wireframes.php  -- static wireframe routes
-  console.php     -- scheduler definitions (queue:work, cleanup, rate fetch, disk check)
+QUEUE_CONNECTION=database
+FILESYSTEM_DISK=public
+SERVICES_RATE_API_URL=https://your-rate-provider/endpoint
 ```
 
-## Git Workflow
+## Server cron (Hostinger panel — one line only)
 
-```
-main        -- production, protected, deploy-only
-staging     -- pre-release testing (mirrors hosting env)
-feature/*   -- one branch per module/feature, short-lived
-```
-
-- No direct pushes to `main`.
-- Branch → PR → review → merge to `staging` → test on staging subdomain → merge to `main`.
-- Tag every production release (`v1.0`, `v1.1`, ...) — makes rollback trivial on shared hosting where there's no easy infrastructure-level rollback.
-
-**Commit messages:** reference the module (`stock:`, `movements:`, `sales:`) so history stays scannable as the app grows.
-
-## Deployment (Hostinger — SSH + cron only, no CI server)
-
-```bash
-#!/bin/bash
-# deploy.sh — run via SSH on the server
-git pull origin main
-composer install --no-dev --optimize-autoloader
-php artisan migrate --force
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
-php artisan queue:restart
-```
-
-- `.env` is **not** in git — maintained manually per environment.
-- Never run `migrate:fresh` in production — only `migrate`.
-- `config:cache` / `route:cache` matter more here — shared hosting has weaker CPU, caching saves real latency.
-
-**Server cron — one line only, everything else is handled by Laravel's scheduler:**
 ```
 * * * * * php /home/USERNAME/domains/YOURDOMAIN/public_html/artisan schedule:run >> /dev/null 2>&1
 ```
 
-**Optional:** a GitHub Actions workflow that SSHs in and runs `deploy.sh` on push to `main` removes the manual SSH step — free tier covers this.
+## What's included in this scaffold
 
-## Staging
+- 21 migrations covering stock hierarchy, movements, sales, purchases, accounting ledger, customers, loyalty, installments, QR
+- Models with relationships wired (Item ↔ Packet ↔ Box, Movement polymorphic, Sale ↔ Items pivot with frozen price)
+- `PricingService` — live price calculation, never stored
+- `PhotoCompressionService` — WebP compression on upload
+- `RateFetchService` — daily rate API pull with manual-entry fallback
+- 3 scheduled commands: photo cleanup, rate fetch, disk usage alert
 
-Use a subdomain (`staging.yourdomain.com`) on the same hosting, separate database. Test every migration and integration (rate API, WhatsApp) here before touching production — there's no fast rollback on shared hosting, so staging is the safety net.
+## Stock module (built, styled)
 
-## Current Module Status
+- `app/Livewire/Stock/BoxManager.php`, `PacketManager.php`, `ItemManager.php`
+- Views: `resources/views/livewire/stock/*.blade.php` — restyled to match the client wireframes (Newsreader/Public Sans fonts, tan accent `#A9772F`, cream background `#FAF8F4`)
+- Shared layout: `resources/views/components/layouts/app.blade.php` — sidebar nav, used via `<x-layouts.app>`
+- Routes: `routes/stock.php` — add `require __DIR__.'/stock.php';` to the end of `routes/web.php`
+- No delete on Box/Packet — deletion would break movement history. Deactivate later if ever needed, don't remove.
+- Item auto-generates a 7-char `internal_code` when no HUID is given; pair items (earrings/bangles) share `pair_group_id`.
 
-| Module | Status |
+Visit `/stock/boxes`, `/stock/packets`, `/stock/items` once routes are wired and you're logged in.
+
+## Static wireframes (view-only, converted from client HTMLs)
+
+- `resources/views/wireframes/*.blade.php` — all 13 original wireframe screens, converted to Blade views as-is
+- No functionality added — pure static HTML/CSS/JS exactly as designed, just served through Laravel routes
+- Internal links between screens (e.g. `index.html` → `Main.html`) rewritten to use `route()` so navigation works inside the app
+- Routes: `routes/wireframes.php` — add `require __DIR__.'/wireframes.php';` to the end of `routes/web.php`
+
+Visit `/wireframes` to browse all screens exactly as shown to the client.
+
+**Next step when ready:** wire each wireframe's markup/CSS into the matching real Livewire component (Stock module already does this for the styling — Inventory/ItemDetail/Movements screens still need their static HTML turned into live views backed by real data).
+
+## Roles / Users / Employees module (built)
+
+- `app/Livewire/Admin/EmployeeManager.php`, `UserManager.php`, `RoleManager.php`
+- Views: `resources/views/livewire/admin/*.blade.php`
+- Seeder: `database/seeders/RolePermissionSeeder.php` — run with `php artisan db:seed --class=RolePermissionSeeder`
+- Default roles seeded: `owner`, `manager`, `accountant`, `counter_staff`, `karigar_handler` — each with a scoped permission set
+- Routes: `routes/admin.php` — add `require __DIR__.'/admin.php';` to `routes/web.php`, gated per-route by `permission:` middleware
+- Sidebar now shows Admin links only to users with the matching permission (`@can('employee.manage')` etc.)
+- **Never delete** a User or Employee — deactivate only (`is_active` / `status` flags). Every movement/sale references `user_id`; deleting would break attribution.
+
+**Still needed before this is production-ready:**
+- Login must check `is_active` and reject disabled users — add this check to your auth guard/login listener (not yet wired, since Breeze/Fortify specifics depend on which you install)
+- First owner account: create manually via `php artisan tinker` after migrating + seeding, then assign the `owner` role
+
+```php
+// tinker, one-time setup
+$u = App\Models\User::create(['name' => 'Owner', 'email' => 'owner@shop.com', 'password' => bcrypt('changeme'), 'is_active' => true]);
+$u->assignRole('owner');
+```
+
+## Login is_active enforcement (built)
+
+- `app/Http/Requests/Auth/LoginRequest.php` overrides Breeze's default — copy this over your existing one at the same path
+- Blocks login for any user with `is_active = false`, with a clear message, instead of just hiding them from the UI
+
+## Discount rules (built)
+
+- Migration: `2024_01_01_000095_create_discount_rules_table.php`
+- Model: `app/Models/Pricing/DiscountRule.php` — precedence: item → packet → box → category → weight tier, first match wins
+- `PricingService` now applies the best matching rule automatically; the accountant's manual discount at checkout (`sales.discount`) is separate and stacks on top at Sales-module build time
+- No admin UI yet for creating rules — add a `DiscountRuleManager` Livewire component when the Sales module is built (same pattern as Stock/Admin managers)
+
+## Loyalty & Referral (built)
+
+- `app/Services/LoyaltyService.php` — awards points per sale (rate is a single constant, easy to tune), pays referral bonus to the referrer on the referred customer's **first confirmed sale** (not at signup, so it can't be gamed)
+- Call `LoyaltyService::awardForSale($sale)` once a sale is confirmed — wire this in when the Sales module is built
+- `loyalty_transactions` is the source of truth; `customers.loyalty_points` is just a cached total for fast display
+
+## Customer Portal (built)
+
+Customers log in with **phone + password**, on a completely separate `customer` auth guard — never mixed with staff `users`/`web` guard.
+
+- Migration: `2024_01_01_000096_add_auth_fields_to_customers_table.php` — adds `password`/`remember_token` to `customers`
+- Model: `Customer` now implements `Authenticatable`
+- **Config step required:** merge `config/auth-additions.md` into your real `config/auth.php` — adds the `customer` guard + `customers` provider
+- `app/Livewire/Portal/CustomerLogin.php`, `CustomerDashboard.php` — dashboard has 3 tabs: Past Purchases, Loyalty & Referral (shows their referral code), Installments (scheme + payment history)
+- Routes: `routes/portal.php` — add `require __DIR__.'/portal.php';` to `routes/web.php`
+- Visit `/portal/login`
+
+**How a customer gets portal access:** staff sets a password for them manually (no self-signup flow built yet — add a "Set Portal Password" action to a future Customer management screen if self-signup isn't wanted).
+
+## Loyalty settings + referral overview (built)
+
+- `app/Livewire/Admin/LoyaltySettingsManager.php` — owner-editable points-per-rupee, referral bonus, redemption minimum, point value in ₹. Backed by single-row `loyalty_settings` table, not hardcoded constants.
+- `app/Livewire/Admin/ReferralOverview.php` — read-only report: who referred whom, whether each referral's bonus has actually been earned yet
+- `LoyaltyService` now reads rates from `LoyaltySetting::current()` instead of class constants
+- Customer portal's Loyalty tab now also lists people *they've* referred, with bonus-earned status
+- Routes added to `routes/admin.php`, sidebar links gated by `loyalty.manage` permission (added to seeder)
+
+## Not included yet (next steps)
+
+**Rule for every module below: convert the matching static wireframe from `resources/views/wireframes/` — don't design new markup from scratch.** The wireframes are the client-approved layout; live modules should reuse their HTML/CSS structure and wire real Livewire data into it, the same way the Stock module's views were restyled from the wireframe look rather than invented fresh. Delete the static wireframe view once its live replacement covers the same screen, so there's never two competing versions of one screen.
+
+| Module to build | Wireframe(s) to convert |
 |---|---|
-| Stock (Box/Packet/Item) | ✅ Live, Livewire |
-| Wireframes (all 13 screens) | ✅ Static reference only |
-| Movements | ⬜ Not built |
-| Sales / Billing | ⬜ Not built |
-| Purchases / Vendors | ⬜ Not built |
-| Accounting Ledger | ⬜ Not built |
-| Customer / Loyalty / Installments | ⬜ Not built |
-| Dashboard / History / Logbook / Reports | ⬜ Not built |
+| Movements | `karigar-dispatch.blade.php`, `karigar-return.blade.php`, `external-movement.blade.php`, `move-stock.blade.php`, `scan-stock.blade.php`, `box-packet.blade.php` |
+| Sales module | *(no wireframe provided yet — ask the client for a billing screen mockup before building, or extend `item-detail.blade.php`'s layout if that's the intended base)* |
+| Main dashboard (+ price history chart) | `main.blade.php` |
+| Item Detail (live) | `item-detail.blade.php` |
+| Inventory (live) — already superseded by `ItemManager`, but check it visually matches | `inventory.blade.php` |
+| History | `history.blade.php` |
+| Logbook | `logbook.blade.php` |
+| Location Report | `location-report.blade.php` |
+| Audit log viewer | *(no wireframe — new screen, style to match the rest via `components/layouts/app.blade.php`)* |
 
-Build order and reasoning for each: see `DEVELOPER_GUIDE.md`, Section 4.
+- `DiscountRuleManager` admin screen (schema + logic done, no UI yet — no wireframe either, style via the shared layout)
+- Customer self-signup for the portal, if wanted (currently staff-assigned password only)
+- GST invoice PDF template
+- Tally export service

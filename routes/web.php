@@ -4,7 +4,7 @@ use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('welcome');
+    return auth()->check() ? redirect()->route('dashboard') : view('welcome');
 });
 
 Route::get('/dashboard', function () {
@@ -18,6 +18,7 @@ Route::middleware('auth')->group(function () {
 });
 
 require __DIR__.'/auth.php';
-
-require __DIR__.'/wireframes.php';require __DIR__.'/stock.php';
+require __DIR__.'/stock.php';
+require __DIR__.'/admin.php';
 require __DIR__.'/wireframes.php';
+require __DIR__.'/portal.php';

@@ -1,14 +1,22 @@
 <?php
 namespace App\Models\Customer;
 
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
 
-class Customer extends Model
+// Authenticatable — customers log in through a separate 'customer' guard,
+// completely independent of the staff `users` table/guard. Never merge
+// these two — a customer must never be assignable a staff role.
+class Customer extends Authenticatable
 {
+    use Notifiable;
+
     protected $fillable = [
-        'name', 'phone', 'address', 'email', 'gstin', 'balance', 'status',
+        'name', 'phone', 'address', 'email', 'password', 'gstin', 'balance', 'status',
         'loyalty_points', 'referral_code', 'referred_by', 'imported_from_tally',
     ];
+
+    protected $hidden = ['password', 'remember_token'];
 
     public function sales()
     {
@@ -28,5 +36,12 @@ class Customer extends Model
     public function referredBy()
     {
         return $this->belongsTo(self::class, 'referred_by');
+    }
+
+    // Customers this one referred (inverse of referredBy) — used by the
+    // owner-facing Referral Overview report.
+    public function referrals()
+    {
+        return $this->hasMany(self::class, 'referred_by');
     }
 }

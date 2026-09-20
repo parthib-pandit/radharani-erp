@@ -45,6 +45,20 @@ table.rj-table td{padding:12px 8px;border-bottom:1px solid #F3EFE8;}
     <a class="rj-nav-link {{ request()->routeIs('stock.boxes') ? 'active' : '' }}" href="{{ route('stock.boxes') }}">Box &amp; Packet</a>
     <a class="rj-nav-link {{ request()->routeIs('stock.packets') ? 'active' : '' }}" href="{{ route('stock.packets') }}">Packets</a>
     <a class="rj-nav-link {{ request()->routeIs('stock.items') ? 'active' : '' }}" href="{{ route('stock.items') }}">Inventory</a>
+    @can('employee.manage')
+    <div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:18px 0 6px 12px;">Admin</div>
+    <a class="rj-nav-link {{ request()->routeIs('admin.employees') ? 'active' : '' }}" href="{{ route('admin.employees') }}">Employees</a>
+    @endcan
+    @can('user.manage')
+    <a class="rj-nav-link {{ request()->routeIs('admin.users') ? 'active' : '' }}" href="{{ route('admin.users') }}">Users</a>
+    @endcan
+    @can('role.manage')
+    <a class="rj-nav-link {{ request()->routeIs('admin.roles') ? 'active' : '' }}" href="{{ route('admin.roles') }}">Roles &amp; Permissions</a>
+    @endcan
+    @can('loyalty.manage')
+    <a class="rj-nav-link {{ request()->routeIs('admin.loyalty-settings') ? 'active' : '' }}" href="{{ route('admin.loyalty-settings') }}">Loyalty Settings</a>
+    <a class="rj-nav-link {{ request()->routeIs('admin.referrals') ? 'active' : '' }}" href="{{ route('admin.referrals') }}">Referrals</a>
+    @endcan
   </div>
   <div class="rj-main">
     {{ $slot }}

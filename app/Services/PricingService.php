@@ -3,6 +3,7 @@ namespace App\Services;
 
 use App\Models\Stock\Item;
 use App\Models\Movement\RateLog;
+use App\Models\Pricing\DiscountRule;
 
 class PricingService
 {
@@ -22,6 +23,17 @@ class PricingService
 
         $huidCharge = $item->huid_code ? 45 : 0;
 
-        return round($base + $making + $huidCharge, 2);
+        $price = round($base + $making + $huidCharge, 2);
+
+        // Automatic discount rules (item > packet > box > category > weight
+        // tier precedence) are applied here. This is separate from any
+        // manual discount an accountant enters at checkout (sales.discount) —
+        // that one stacks on top of this, applied in the Sales module.
+        $rule = DiscountRule::bestFor($item);
+        if ($rule) {
+            $price = $rule->apply($price);
+        }
+
+        return $price;
     }
 }
