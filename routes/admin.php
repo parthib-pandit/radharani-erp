@@ -6,6 +6,7 @@ use App\Livewire\Admin\UserManager;
 use App\Livewire\Admin\RoleManager;
 use App\Livewire\Admin\LoyaltySettingsManager;
 use App\Livewire\Admin\ReferralOverview;
+use App\Livewire\Admin\CustomerManager;
 
 // Owner/manager only — gated by Spatie permissions, seeded via RolePermissionSeeder.
 Route::middleware(['auth'])->prefix('admin')->group(function () {
@@ -23,4 +24,7 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
 
     Route::get('/referrals', ReferralOverview::class)
         ->middleware('permission:loyalty.manage')->name('admin.referrals');
+
+    Route::get('/customers', CustomerManager::class)
+        ->middleware('permission:customer.manage')->name('admin.customers');
 });

@@ -59,6 +59,9 @@ table.rj-table td{padding:12px 8px;border-bottom:1px solid #F3EFE8;}
     <a class="rj-nav-link {{ request()->routeIs('admin.loyalty-settings') ? 'active' : '' }}" href="{{ route('admin.loyalty-settings') }}">Loyalty Settings</a>
     <a class="rj-nav-link {{ request()->routeIs('admin.referrals') ? 'active' : '' }}" href="{{ route('admin.referrals') }}">Referrals</a>
     @endcan
+    @can('customer.manage')
+    <a class="rj-nav-link {{ request()->routeIs('admin.customers') ? 'active' : '' }}" href="{{ route('admin.customers') }}">Customers</a>
+    @endcan
   </div>
   <div class="rj-main">
     {{ $slot }}

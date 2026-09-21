@@ -10,16 +10,19 @@ class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
 
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $this->call([
+            RolePermissionSeeder::class,
         ]);
+
+        // Change this email/password, then log in and change it again from
+        // the UI. This replaces Laravel's default factory-created test user,
+        // which had no role and wasn't useful here.
+        $owner = User::firstOrCreate(
+            ['email' => 'echocrew@owner.com'],
+            ['name' => 'Owner', 'password' => bcrypt('password'), 'is_active' => true]
+        );
+        $owner->assignRole('owner');
     }
 }

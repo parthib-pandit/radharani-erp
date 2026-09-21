@@ -1,6 +1,6 @@
 # Radharani Jewellery ERP — Finalized Schema Reference
 
-Single source of truth for every table as it currently stands in the scaffold (23 migrations). This supersedes the table-by-table sections scattered across earlier design docs — if anything conflicts, this file wins.
+Single source of truth for every table as it currently stands in the scaffold (24 migrations). This supersedes the table-by-table sections scattered across earlier design docs — if anything conflicts, this file wins.
 
 ## ER Diagrams
 
@@ -17,6 +17,8 @@ Single source of truth for every table as it currently stands in the scaffold (2
 ---
 
 ## Stock Hierarchy
+
+**`jobs`, `job_batches`, `failed_jobs`** — standard Laravel queue tables, required because `QUEUE_CONNECTION=database`. Easy to forget since they're not part of any business-domain migration — omitting them breaks `queue:work` with "table jobs doesn't exist."
 
 **`employees`** — id, name, phone, address, designation, salary, joining_date, status(active/inactive)
 

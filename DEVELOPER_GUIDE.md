@@ -104,14 +104,16 @@ Every write to `movements`, `sales`, `purchases` is attributed to an authenticat
 ## 4. The Scaffold — What's Actually Built vs. What's Next
 
 **Built:**
-- All 23 migrations (schema in `SCHEMA_REFERENCE.md`, fully in place)
+- All 24 migrations (schema in `SCHEMA_REFERENCE.md`, fully in place — includes the `jobs`/`job_batches`/`failed_jobs` tables required by the `database` queue driver)
 - Models, organized by domain folder (`app/Models/Stock/`, `Movement/`, `Sales/`, `Purchase/`, `Accounting/`, `Customer/`, `Pricing/`)
 - `PricingService` (with discount rules applied), `PhotoCompressionService`, `RateFetchService`, `LoyaltyService`
 - 3 scheduled console commands (photo cleanup, rate fetch, disk usage alert) — all wired through `routes/console.php` so a single cron entry drives everything
 - **Stock module**, fully live: `BoxManager`, `PacketManager`, `ItemManager`
-- **Admin module**, fully live: `EmployeeManager`, `UserManager`, `RoleManager`, `LoyaltySettingsManager`, `ReferralOverview`
-- **Customer portal**, fully live: phone+password login, dashboard with Purchases/Loyalty/Installments tabs, referral list
+- **Admin module**, fully live: `EmployeeManager`, `UserManager`, `RoleManager`, `LoyaltySettingsManager`, `ReferralOverview`, `CustomerManager` (creates customers, sets/resets portal passwords — the only way customers get portal access, by design)
+- **Customer portal**, fully live: phone+password login, dashboard with Purchases/Loyalty/Installments tabs, referral list — runs on its own minimal layout (`components/layouts/guest.blade.php`), never Breeze's staff-assuming default
 - **Wireframes**, static: all 13 client-approved screens, reference-only, no logic
+
+**Four setup steps that live outside our generated files** — required once on any fresh clone, see `README.md`'s "Setup steps required that no file can automate" section: Spatie middleware aliases in `bootstrap/app.php`, the `customer` guard in `config/auth.php`, running `breeze:install` (not just requiring the package), and re-applying `LoginRequest.php` after any Breeze reinstall.
 
 **Not built yet — build in this order, each depends on the last:**
 1. **Movements module** — live version of KarigarDispatch, KarigarReturn, ExternalMovement, MoveStock, ScanStock. Depends on Stock (done).

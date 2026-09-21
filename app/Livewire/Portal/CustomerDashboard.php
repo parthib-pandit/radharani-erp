@@ -31,6 +31,7 @@ class CustomerDashboard extends Component
             'referrals' => fn ($q) => $q->withCount('sales'),
         ]);
 
-        return view('livewire.portal.customer-dashboard', ['customer' => $customer]);
+        return view('livewire.portal.customer-dashboard', ['customer' => $customer])
+            ->layout('components.layouts.guest');
     }
 }

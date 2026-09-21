@@ -17,8 +17,6 @@ class CustomerLogin extends Component
             'password' => 'required|string',
         ]);
 
-        // Customers log in with phone, not email — matches how the shop
-        // already identifies them at the counter.
         if (! Auth::guard('customer')->attempt(['phone' => $this->phone, 'password' => $this->password])) {
             throw ValidationException::withMessages(['phone' => 'Invalid phone number or password.']);
         }
@@ -29,6 +27,7 @@ class CustomerLogin extends Component
 
     public function render()
     {
-        return view('livewire.portal.customer-login');
+        return view('livewire.portal.customer-login')
+            ->layout('components.layouts.guest');
     }
 }
