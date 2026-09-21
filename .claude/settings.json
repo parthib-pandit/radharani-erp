@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php artisan *)",
+      "Bash(composer *)"
+    ],
+    "deny": [
+      "Bash(php artisan migrate:fresh*)",
+      "Bash(php artisan migrate:rollback*)"
+    ]
+  }
+}

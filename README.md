@@ -1,6 +1,6 @@
 # Radharani Jewellery ERP
 
-Internal stock-management ERP + read-only ecommerce catalog for a jewellery shop. See `DEVELOPER_GUIDE.md` for system design, schema, and reasoning before making structural changes.
+Internal stock-management ERP + read-only ecommerce catalog for a jewellery shop. See `docs/DEVELOPER_GUIDE.md` for system design, schema, and reasoning before making structural changes.
 
 ## Stack
 
@@ -146,4 +146,4 @@ Use a subdomain (`staging.yourdomain.com`) on the same hosting, separate databas
 | Customer / Loyalty / Installments | ⬜ Not built |
 | Dashboard / History / Logbook / Reports | ⬜ Not built |
 
-Build order and reasoning for each: see `DEVELOPER_GUIDE.md`, Section 4.
+Build order and reasoning for each: see `docs/DEVELOPER_GUIDE.md`, Section 4.
