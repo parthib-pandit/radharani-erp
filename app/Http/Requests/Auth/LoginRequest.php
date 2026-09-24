@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use App\Support\Phone;
 
 class LoginRequest extends FormRequest
 {
@@ -34,12 +35,17 @@ class LoginRequest extends FormRequest
         $this->ensureIsNotRateLimited();
 
         $field = $this->string('method')->value() === 'phone' ? 'phone' : 'email';
+        $login = $field === 'phone'
+            ? Phone::normalize($this->string('login')->value())
+            : trim($this->string('login')->value());
 
-        if (! Auth::attempt([$field => $this->string('login')->value(), 'password' => $this->string('password')->value()], $this->boolean('remember'))) {
+        if (! Auth::attempt([$field => $login, 'password' => $this->string('password')->value()], $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'login' => trans('auth.failed'),
+                'login' => $field === 'phone'
+                    ? "That phone number and password don't match an account."
+                    : "That email and password don't match an account.",
             ]);
         }
 

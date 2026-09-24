@@ -58,6 +58,14 @@ Confirmed client requirements this build is based on: @docs/REQUIREMENTS.md
 
 See `docs/REQUIREMENTS.md` for the full confirmed-requirements document this build was implemented against, including everything listed above as "still open."
 
+## Stock module conventions
+
+- **Regrouping is history.** `Item`, `Packet` and `Box` log changes via `spatie/laravel-activitylog` (log name `stock`); `StockHistoryService` merges those with `movements`, sales and QR scans into the Item/Packet/Box Detail timelines. So always move things with a per-model `->update(['packet_id' => ...])` / `->update(['box_id' => ...])`. A mass `Item::whereIn(...)->update(...)` bypasses model events and silently drops the move from history.
+- **QR stickers** (`QrCode`) encode `route('stock.qr.resolve', $code)`; resolving logs a `scanned` activity and redirects to the detail page. `QrCode::forTarget()` reuses an existing code rather than minting a second one. SVGs are rendered by `chillerlan/php-qrcode` (no GD needed); print sheets are at `stock.qr.print?ids=...`.
+- **Scanner input** goes through `App\Support\StockLookup`, which accepts HUIDs, internal codes, packet/box codes, sticker codes and full scan URLs. Spreadsheets (CSV/XLSX) go through `App\Support\SpreadsheetReader` (`openspout/openspout`).
+- **The Add/Edit Item form** is its own component (`Stock\ItemForm`), opened with `Livewire.dispatch('open-item-form', { id })` / `{ purchaseItemId }` and emitting `item-saved`. Don't duplicate it into other pages; embed `<livewire:stock.item-form />`.
+- **List pages** use `App\Livewire\Concerns\WithDataTable` with `<x-ui.datatable>` (see `docs/DESIGN_SYSTEM.md`).
+
 ## The Livewire double-layout trap (read before touching any full-page component)
 
 Every full-page Livewire component (anything bound directly to a route, e.g. `Route::get('/x', SomeComponent::class)`) gets auto-wrapped by Livewire in a layout on **every** request if it doesn't call `->layout()` itself — including AJAX responses for `wire:click`/`wire:submit`. If the component's own Blade view *also* wraps its content in `<x-layouts.app>` (a full `<html>`/`<head>`/`<body>` document), every interactive action returns an entire second HTML document as the morph payload, which breaks the page (it goes blank) after literally any button click. This exact bug shipped for a while — every full-page component was self-wrapping and had zero working interactions beyond the initial page load.
@@ -80,4 +88,5 @@ Livewire v3 bundles its own copy of Alpine and unconditionally sets `window.Alpi
 4. Portal Livewire components must use `->layout('components.layouts.guest')`, never Breeze's default — that default assumes a staff login and crashes on any guest/customer page.
 5. The `jobs`/`job_batches`/`failed_jobs` tables aren't part of any business migration — easy to forget, breaks the queue silently until first dispatch.
 6. `public/storage` must be a symlink to `storage/app/public` on **this machine** (`php artisan storage:link`) — it silently breaks (points at a stale path) if the project directory is ever moved or cloned somewhere new.
-7. After a fresh clone/migrate, run `php artisan db:seed --class=DemoDataSeeder` (local/testing environments only — it's gated out of anything else) to get realistic test data across every module instead of empty screens.
+7. Time is **IST everywhere**: `config/app.php` timezone defaults to `Asia/Kolkata` (`APP_TIMEZONE`) and the MySQL session is set to `+05:30` (`DB_TIMEZONE`) so `CURRENT_TIMESTAMP` defaults agree. Don't reintroduce `'UTC'`. Rows written before 25 Sep 2026 were stored as UTC and display 5h30m early; they were deliberately not rewritten because `movements`/`sales`/`purchases` are insert-only.
+8. After a fresh clone/migrate, run `php artisan db:seed --class=DemoDataSeeder` (local/testing environments only — it's gated out of anything else) to get realistic test data across every module instead of empty screens.

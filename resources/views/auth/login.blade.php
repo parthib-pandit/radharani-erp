@@ -1,133 +1,96 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Staff Sign In — Radharani Jewellery ERP</title>
-@vite(['resources/css/app.css', 'resources/js/app.js'])
-<style>[x-cloak]{display:none !important;}</style>
-@livewireStyles
-</head>
-<body class="font-sans antialiased text-ink_text-primary">
-<div class="min-h-screen flex">
+<x-layouts.guest title="Staff sign in · Radharani Jewellery Works">
+<x-auth.shell audience="staff">
+    <x-slot:aside>
+        <a href="{{ route('portal.login') }}" class="group inline-flex items-center gap-1.5 text-[13px] font-semibold text-ink_text-secondary hover:text-gold-dark">
+            Customer? Sign in to the portal
+            <x-ui.icon name="arrow-right" :size="14" class="transition-transform group-hover:translate-x-0.5" />
+        </a>
+    </x-slot:aside>
 
-  {{-- Brand panel --}}
-  <div class="w-[44%] min-w-[380px] bg-ink text-white/90 p-14 flex flex-col justify-between">
-    <div class="flex items-center gap-2.5">
-      <div class="w-[34px] h-[34px] shrink-0 rounded-[9px] bg-gradient-to-br from-gold-light to-gold flex items-center justify-center">
-        <x-ui.icon name="gem" :size="17" class="text-ink" />
-      </div>
-      <div>
-        <div class="text-sm font-bold text-white tracking-wide">RADHARANI ERP</div>
-        <div class="text-[9.5px] font-semibold tracking-widest text-[#8E8A80]">JEWELLERY WORKS</div>
-      </div>
-    </div>
+    {{-- Mobile number is the default: staff know their phone number better than a work email. --}}
+    <div x-data="{ method: '{{ old('method', 'phone') }}', submitting: false }">
+        <p class="text-[12px] font-bold uppercase tracking-[0.18em] text-gold-dark">Staff sign in</p>
+        <h1 class="font-display text-[40px] leading-[1.08] font-semibold mt-2">Welcome back</h1>
+        <p class="text-[14px] text-ink_text-secondary mt-2">Sign in with your mobile number or work email.</p>
 
-    <div>
-      <div class="text-3xl font-semibold leading-tight text-white max-w-[360px]">Precision. Trust. Craftsmanship.</div>
-      <div class="text-[13.5px] text-[#C9C4B8] leading-relaxed mt-3.5 max-w-[340px]">
-        Internal staff access for vault, counter, karigar and sales tracking. Every entry here is tied to your account.
-      </div>
+        @session('status')
+            <div class="flex items-start gap-2.5 mt-6 px-4 py-3 rounded-xl bg-success-bg text-success text-[13px] font-medium">
+                <x-ui.icon name="check-circle" :size="16" class="shrink-0 mt-px" /> {{ $value }}
+            </div>
+        @endsession
 
-      <div class="flex flex-col gap-3 mt-7">
-        @foreach ([
-          'Access is scoped to your role',
-          'Separate from the customer portal',
-          'Every action is logged for audit',
-        ] as $line)
-        <div class="flex items-center gap-2.5">
-          <span class="w-[22px] h-[22px] shrink-0 rounded-full bg-white/10 flex items-center justify-center">
-            <x-ui.icon name="check" :size="11" class="text-gold-light" />
-          </span>
-          <span class="text-[12.5px] text-[#C9C4B8]">{{ $line }}</span>
-        </div>
-        @endforeach
-      </div>
-    </div>
-
-    <div class="text-[11px] text-[#8E8A80]">© {{ date('Y') }} Radharani Jewellery Works · Staff access only · Powered by Echocrew</div>
-  </div>
-
-  {{-- Form panel --}}
-  <div class="flex-1 bg-surface-bg flex items-center justify-center p-10">
-    <div class="w-full max-w-[360px]" x-data="{ method: '{{ old('method', 'email') }}', showPassword: false }">
-
-      <div class="text-[11px] font-semibold tracking-widest text-gold uppercase mb-2">Staff Sign In</div>
-      <div class="text-xl font-semibold mb-1">Welcome back</div>
-      <div class="text-[13px] text-ink_text-secondary mb-6">Sign in with your work email or phone.</div>
-
-      @session('status')
-        <div class="bg-success-bg text-success rounded-control px-3.5 py-2.5 mb-4 text-sm">{{ $value }}</div>
-      @endsession
-
-      {{-- Identifier method toggle --}}
-      <div class="flex gap-1 bg-surface-muted rounded-control p-1 mb-5">
-        <button type="button" @click="method = 'email'"
-          :class="method === 'email' ? 'bg-white text-ink_text-primary shadow-sm' : 'bg-transparent text-ink_text-secondary'"
-          class="flex-1 h-[34px] rounded-[6px] text-[12.5px] font-semibold">Email</button>
-        <button type="button" @click="method = 'phone'"
-          :class="method === 'phone' ? 'bg-white text-ink_text-primary shadow-sm' : 'bg-transparent text-ink_text-secondary'"
-          class="flex-1 h-[34px] rounded-[6px] text-[12.5px] font-semibold">Phone</button>
-      </div>
-
-      <form method="POST" action="{{ route('login') }}">
-        @csrf
-        <input type="hidden" name="method" x-bind:value="method">
-
-        {{-- Email identifier (live) --}}
-        <div x-show="method === 'email'" x-cloak>
-          <label for="email" class="block text-[11.5px] text-ink_text-secondary mb-1">Email address</label>
-          <input id="email" type="email" x-bind:name="method === 'email' ? 'login' : null" value="{{ old('method') === 'email' ? old('login') : '' }}"
-            x-bind:required="method === 'email'" autofocus autocomplete="username"
-            placeholder="you@radharanierp.com" class="rj-input">
-        </div>
-
-        {{-- Phone identifier --}}
-        <div x-show="method === 'phone'" x-cloak>
-          <label for="phone" class="block text-[11.5px] text-ink_text-secondary mb-1">Phone number</label>
-          <input id="phone" type="tel" x-bind:name="method === 'phone' ? 'login' : null" value="{{ old('method') === 'phone' ? old('login') : '' }}"
-            x-bind:required="method === 'phone'" autocomplete="username"
-            placeholder="98325 03125" class="rj-input">
-        </div>
-
-        @error('login')
-          <div class="text-danger text-[11.5px] mt-1.5">{{ $message }}</div>
-        @enderror
-
-        <div class="mt-4">
-          <label for="password" class="block text-[11.5px] text-ink_text-secondary mb-1">Password</label>
-          <div class="relative">
-            <input :type="showPassword ? 'text' : 'password'" id="password" name="password" required autocomplete="current-password"
-              placeholder="Enter your password" class="rj-input pr-12">
-            <button type="button" @click="showPassword = !showPassword" aria-label="Toggle password visibility"
-              class="absolute right-2 top-0 h-10 bg-transparent border-0 text-ink_text-secondary text-[11.5px] font-semibold">
-              <span x-text="showPassword ? 'Hide' : 'Show'"></span>
+        <div class="rj-segment w-full mt-7" role="tablist" aria-label="Sign in with">
+            <button type="button" role="tab" x-on:click="method = 'phone'; $nextTick(() => $refs.phone.focus())" :aria-selected="method === 'phone'"
+                :class="method === 'phone' ? 'is-active' : ''" class="flex-1 justify-center h-9">
+                <x-ui.icon name="smartphone" :size="15" /> Mobile number
             </button>
-          </div>
-          @error('password')
-            <div class="text-danger text-[11.5px] mt-1.5">{{ $message }}</div>
-          @enderror
+            <button type="button" role="tab" x-on:click="method = 'email'; $nextTick(() => $refs.email.focus())" :aria-selected="method === 'email'"
+                :class="method === 'email' ? 'is-active' : ''" class="flex-1 justify-center h-9">
+                <x-ui.icon name="mail" :size="15" /> Email
+            </button>
         </div>
 
-        <div class="flex items-center justify-between mt-4">
-          <label class="flex items-center gap-2 text-[12.5px] text-ink_text-secondary cursor-pointer">
-            <input type="checkbox" name="remember" class="accent-gold">
-            Remember me
-          </label>
-          @if (Route::has('password.request'))
-            <a href="{{ route('password.request') }}" class="text-[12.5px] font-semibold text-gold">Forgot password?</a>
-          @endif
+        <form method="POST" action="{{ route('login') }}" class="mt-6 space-y-5" x-on:submit="submitting = true">
+            @csrf
+            <input type="hidden" name="method" x-bind:value="method">
+
+            <div x-show="method === 'phone'">
+                <label for="phone" class="rj-label">Mobile number</label>
+                <div class="relative flex">
+                    <span class="inline-flex items-center gap-1.5 h-12 pl-3.5 pr-3 rounded-l-control border border-r-0 border-line bg-surface-sunken text-[14px] font-semibold text-ink_text-secondary">+91</span>
+                    <input id="phone" x-ref="phone" type="tel" inputmode="numeric" maxlength="16"
+                        x-bind:name="method === 'phone' ? 'login' : null" x-bind:required="method === 'phone'" x-bind:disabled="method !== 'phone'"
+                        value="{{ old('method', 'phone') === 'phone' ? old('login') : '' }}"
+                        @if (old('method', 'phone') === 'phone') autofocus @endif autocomplete="username" placeholder="98300 00000"
+                        class="rj-input h-12 rounded-l-none text-[15px] tracking-wide tabular @error('login') is-invalid @enderror">
+                </div>
+            </div>
+
+            <div x-show="method === 'email'" x-cloak>
+                <label for="email" class="rj-label">Work email</label>
+                <div class="rj-input-icon">
+                    <x-ui.icon name="mail" :size="16" />
+                    <input id="email" x-ref="email" type="email"
+                        x-bind:name="method === 'email' ? 'login' : null" x-bind:required="method === 'email'" x-bind:disabled="method !== 'email'"
+                        value="{{ old('method') === 'email' ? old('login') : '' }}"
+                        @if (old('method') === 'email') autofocus @endif autocomplete="username" placeholder="you@radharani.in"
+                        class="rj-input h-12 pl-10 text-[14px] @error('login') is-invalid @enderror">
+                </div>
+            </div>
+
+            @error('login')
+                <p class="rj-error -mt-3"><x-ui.icon name="alert-triangle" :size="12" class="shrink-0" />{{ $message }}</p>
+            @enderror
+
+            <div>
+                <div class="flex items-center justify-between mb-1.5">
+                    <label for="password" class="rj-label !mb-0">Password</label>
+                    @if (Route::has('password.request'))
+                        <a href="{{ route('password.request') }}" class="text-[12.5px] font-semibold">Forgot password?</a>
+                    @endif
+                </div>
+                <x-ui.password-input id="password" name="password" required autocomplete="current-password" placeholder="Your password" :invalid="$errors->has('password')" />
+                @error('password')
+                    <p class="rj-error"><x-ui.icon name="alert-triangle" :size="12" class="shrink-0" />{{ $message }}</p>
+                @enderror
+            </div>
+
+            <label class="inline-flex items-center gap-2.5 text-[13px] text-ink_text-secondary cursor-pointer select-none">
+                <input type="checkbox" name="remember" class="rj-checkbox" @checked(old('remember'))>
+                Keep me signed in on this device
+            </label>
+
+            <button type="submit" :disabled="submitting"
+                class="press w-full h-12 rounded-control gold-sheen text-white text-[14.5px] font-bold shadow-gold border border-gold-dark/30 hover:brightness-[1.07] disabled:opacity-80 inline-flex items-center justify-center gap-2">
+                <span x-show="!submitting" class="inline-flex items-center gap-2">Sign in <x-ui.icon name="arrow-right" :size="16" /></span>
+                <span x-show="submitting" x-cloak class="inline-flex items-center gap-2"><x-ui.icon name="loader" :size="16" class="animate-spin" /> Signing in</span>
+            </button>
+        </form>
+
+        <div class="flex items-start gap-3 mt-8 p-4 rounded-xl bg-white ring-1 ring-line-light">
+            <x-ui.icon name="shield-check" :size="17" class="text-gold-dark shrink-0 mt-0.5" />
+            <p class="text-[12.5px] text-ink_text-secondary leading-relaxed">Access is limited to your role. Trouble signing in? Ask the shop owner or manager to reset your account.</p>
         </div>
-
-        <button type="submit" class="w-full h-[42px] rounded-control border-0 font-bold text-[13.5px] mt-5 bg-gold text-white hover:bg-gold-dark cursor-pointer transition-colors">
-          Sign In
-        </button>
-      </form>
-
-      <div class="text-center text-[11.5px] text-ink_text-secondary mt-5">Trouble signing in? Ask the shop owner or manager.</div>
     </div>
-  </div>
-</div>
-@livewireScripts
-</body>
-</html>
+</x-auth.shell>
+</x-layouts.guest>

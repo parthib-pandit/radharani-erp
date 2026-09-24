@@ -59,6 +59,8 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
+            // Keep MySQL's NOW()/CURRENT_TIMESTAMP on IST too, matching app.timezone on any server.
+            'timezone' => env('DB_TIMEZONE', '+05:30'),
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 Mysql::ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],

@@ -11,6 +11,7 @@ use App\Livewire\Stock\AssignToContainer;
 use App\Livewire\Stock\QrGenerator;
 use App\Livewire\Stock\BulkImport;
 use App\Livewire\Stock\HierarchyConfigurator;
+use App\Http\Controllers\Stock\QrController;
 
 // Stock module — behind auth + a permission gate.
 // Wire up 'stock.manage' permission via Spatie once roles are seeded.
@@ -26,6 +27,9 @@ Route::middleware(['auth'])->prefix('stock')->group(function () {
 
     Route::get('/assign', AssignToContainer::class)->name('stock.assign');
     Route::get('/qr-codes', QrGenerator::class)->name('stock.qr-codes');
+    Route::get('/qr-codes/print', [QrController::class, 'print'])->name('stock.qr.print');
+    // What printed stickers encode: logs the scan, then opens the detail page.
+    Route::get('/q/{code}', [QrController::class, 'resolve'])->name('stock.qr.resolve');
     Route::get('/import', BulkImport::class)->name('stock.import');
     Route::get('/configurator', HierarchyConfigurator::class)->name('stock.configurator');
 });

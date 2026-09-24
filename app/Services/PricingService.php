@@ -12,18 +12,34 @@ class PricingService
     // reprice every product with zero writes.
     public function priceFor(Item $item): float
     {
-        $metal = str_contains(strtolower($item->purity), 'silver') ? 'silver' : 'gold';
-        $rate = RateLog::latestFor($metal)?->rate ?? 0;
+        return $this->breakdown($item)['total'];
+    }
 
-        $base = $item->weight * $rate;
+    // Same calculation as priceFor(), itemised so screens (e.g. Item Detail)
+    // can show how the live price is built up. Provisional pending the
+    // client's Excel sheet (see docs/REQUIREMENTS.md "Still open").
+    public function breakdown(Item $item): array
+    {
+        // items.metal is authoritative; the purity-string guess only covers
+        // legacy rows created before the metal column existed.
+        $metal = $item->metal ?: (str_contains(strtolower((string) $item->purity), 'silver') ? 'silver' : 'gold');
+        $rateLog = RateLog::latestFor($metal);
+        $rate = (float) ($rateLog?->rate ?? 0);
 
-        $making = $item->making_type === 'percentage'
-            ? $base * ($item->making_value / 100)
-            : $item->making_value;
+        $weight = (float) $item->weight;
+        $base = $weight * $rate;
+
+        // Three confirmed making-charge types (Requirement #10).
+        $making = match ($item->making_type) {
+            'percentage' => $base * ((float) $item->making_value / 100),
+            'flat_per_gram' => (float) $item->making_value * $weight,
+            default => (float) $item->making_value, // flat_per_piece (and legacy per_piece)
+        };
 
         $huidCharge = $item->huid_code ? 45 : 0;
 
-        $price = round($base + $making + $huidCharge, 2);
+        $subtotal = round($base + $making + $huidCharge, 2);
+        $total = $subtotal;
 
         // Automatic discount rules (item > packet > box > category > weight
         // tier precedence) are applied here. This is separate from any
@@ -31,9 +47,20 @@ class PricingService
         // that one stacks on top of this, applied in the Sales module.
         $rule = DiscountRule::bestFor($item);
         if ($rule) {
-            $price = $rule->apply($price);
+            $total = $rule->apply($subtotal);
         }
 
-        return $price;
+        return [
+            'metal' => $metal,
+            'rate' => $rate,
+            'rate_at' => $rateLog?->created_at,
+            'metal_value' => round($base, 2),
+            'making' => round($making, 2),
+            'huid_charge' => $huidCharge,
+            'subtotal' => $subtotal,
+            'discount_rule' => $rule,
+            'discount' => round($subtotal - $total, 2),
+            'total' => $total,
+        ];
     }
 }
