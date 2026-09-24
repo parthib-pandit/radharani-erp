@@ -15,26 +15,31 @@ class LoginRequest extends FormRequest
         return true;
     }
 
+    // #19 Staff login uses phone number or email. The form submits a
+    // single `login` field for whichever tab is active, plus `method`
+    // ('email' or 'phone') saying which column to check it against.
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
+            'login' => ['required', 'string'],
+            'method' => ['required', 'in:email,phone'],
             'password' => ['required', 'string'],
         ];
     }
 
-    // Overrides Breeze's default authenticate() to add the is_active check.
-    // Disabled staff (see UserManager) must be blocked at login, not just
-    // hidden from the UI — this is the actual enforcement point.
+    // Overrides Breeze's default authenticate() to add the is_active check
+    // and the phone/email identifier switch.
     public function authenticate(): void
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        $field = $this->string('method')->value() === 'phone' ? 'phone' : 'email';
+
+        if (! Auth::attempt([$field => $this->string('login')->value(), 'password' => $this->string('password')->value()], $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'login' => trans('auth.failed'),
             ]);
         }
 
@@ -42,7 +47,7 @@ class LoginRequest extends FormRequest
             Auth::logout();
 
             throw ValidationException::withMessages([
-                'email' => 'This account has been disabled. Contact the shop owner.',
+                'login' => 'This account has been disabled. Contact the shop owner.',
             ]);
         }
 
@@ -60,7 +65,7 @@ class LoginRequest extends FormRequest
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
+            'login' => trans('auth.throttle', [
                 'seconds' => $seconds,
                 'minutes' => ceil($seconds / 60),
             ]),
@@ -69,6 +74,6 @@ class LoginRequest extends FormRequest
 
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+        return Str::transliterate(Str::lower($this->string('login')).'|'.$this->ip());
     }
 }

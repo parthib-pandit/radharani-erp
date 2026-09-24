@@ -46,6 +46,6 @@ class LoyaltySettingsManager extends Component
 
     public function render()
     {
-        return view('livewire.admin.loyalty-settings-manager');
+        return view('livewire.admin.loyalty-settings-manager')->layout('components.layouts.app', ['title' => 'Loyalty Settings — Radharani Jewellery']);
     }
 }

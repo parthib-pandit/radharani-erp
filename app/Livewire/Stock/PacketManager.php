@@ -67,6 +67,6 @@ class PacketManager extends Component
                 ->orderByDesc('id')
                 ->paginate(15),
             'boxes' => Box::orderBy('code')->get(),
-        ]);
+        ])->layout('components.layouts.app', ['title' => 'Packets — Radharani Jewellery ERP']);
     }
 }

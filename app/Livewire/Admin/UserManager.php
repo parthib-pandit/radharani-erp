@@ -95,6 +95,6 @@ class UserManager extends Component
                 ->paginate(15),
             'roles' => Role::orderBy('name')->pluck('name'),
             'employees' => Employee::where('status', 'active')->orderBy('name')->get(),
-        ]);
+        ])->layout('components.layouts.app', ['title' => 'Users — Radharani Jewellery']);
     }
 }

@@ -65,6 +65,6 @@ class BoxManager extends Component
                 ->withCount('packets')
                 ->orderByDesc('id')
                 ->paginate(15),
-        ]);
+        ])->layout('components.layouts.app', ['title' => 'Boxes — Radharani Jewellery ERP']);
     }
 }

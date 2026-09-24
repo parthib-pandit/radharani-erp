@@ -1,3 +1,37 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+    body {
+        @apply bg-surface-bg text-ink_text-primary font-sans;
+    }
+    a {
+        @apply text-gold;
+    }
+    a:hover {
+        @apply text-gold-dark;
+    }
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: #DED9CC;
+        border-radius: 8px;
+    }
+}
+
+@layer components {
+    .rj-input {
+        @apply w-full h-10 rounded-control border border-line bg-white px-3 text-[13.5px] text-ink_text-primary placeholder:text-ink_text-muted;
+    }
+    .rj-input:focus, .rj-select:focus {
+        @apply outline-none border-gold ring-4 ring-gold/10;
+    }
+    .rj-select {
+        @apply h-10 rounded-control border border-line bg-white pl-3 pr-9 text-[13.5px] text-ink_text-primary;
+    }
+}

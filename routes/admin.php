@@ -7,6 +7,9 @@ use App\Livewire\Admin\RoleManager;
 use App\Livewire\Admin\LoyaltySettingsManager;
 use App\Livewire\Admin\ReferralOverview;
 use App\Livewire\Admin\CustomerManager;
+use App\Livewire\Admin\CustomerDetail;
+use App\Livewire\Admin\CustomerBulkImport;
+use App\Livewire\Admin\AuditLogViewer;
 
 // Owner/manager only — gated by Spatie permissions, seeded via RolePermissionSeeder.
 Route::middleware(['auth'])->prefix('admin')->group(function () {
@@ -27,4 +30,13 @@ Route::middleware(['auth'])->prefix('admin')->group(function () {
 
     Route::get('/customers', CustomerManager::class)
         ->middleware('permission:customer.manage')->name('admin.customers');
+
+    Route::get('/customers/import', CustomerBulkImport::class)
+        ->middleware('permission:customer.manage')->name('admin.customers.import');
+
+    Route::get('/customers/{customer}', CustomerDetail::class)
+        ->middleware('permission:customer.manage')->name('admin.customers.detail');
+
+    Route::get('/audit-log', AuditLogViewer::class)
+        ->middleware('permission:audit.view')->name('admin.audit-log');
 });

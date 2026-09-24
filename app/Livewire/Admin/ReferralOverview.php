@@ -24,6 +24,6 @@ class ReferralOverview extends Component
             ->orderByDesc('referrals_count')
             ->paginate(15);
 
-        return view('livewire.admin.referral-overview', ['referrers' => $referrers]);
+        return view('livewire.admin.referral-overview', ['referrers' => $referrers])->layout('components.layouts.app', ['title' => 'Referrals — Radharani Jewellery']);
     }
 }

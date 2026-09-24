@@ -71,6 +71,6 @@ class RoleManager extends Component
         return view('livewire.admin.role-manager', [
             'roles' => Role::withCount('users', 'permissions')->orderBy('name')->get(),
             'allPermissions' => Permission::orderBy('name')->pluck('name'),
-        ]);
+        ])->layout('components.layouts.app', ['title' => 'Roles & Permissions — Radharani Jewellery']);
     }
 }

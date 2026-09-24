@@ -20,7 +20,7 @@ Everything in the schema serves one of these goals:
 
 | Choice | Why |
 |---|---|
-| Laravel 11 | Long support window, everything else here builds on it |
+| Laravel 13 (PHP 8.4) | Long support window, everything else here builds on it |
 | Blade + Livewire (not Vue/React SPA) | No separate API layer, no frontend build pipeline to break on shared hosting, matches small-team size |
 | MySQL 8+ | JSON columns for flexible fields, what Hostinger provides |
 | Database queue driver | No Redis available — `jobs` table needs zero extra infrastructure |
@@ -34,7 +34,7 @@ Everything in the schema serves one of these goals:
 
 ## 3. Schema — Full Reference
 
-The complete, current schema (all 23 migrations, every column, every relationship) lives in **`SCHEMA_REFERENCE.md`**, including two ER diagrams — read that alongside this section. What follows here is the *reasoning* behind the non-obvious decisions; the reference doc is the source of truth for exact columns.
+The complete, current schema (all 36 migrations, every column, every relationship) lives in **`SCHEMA_REFERENCE.md`**, including two ER diagrams — read that alongside this section. What follows here is the *reasoning* behind the non-obvious decisions; the reference doc is the source of truth for exact columns.
 
 ### Stock Hierarchy — `boxes`, `packets`, `items`
 
@@ -42,7 +42,13 @@ Three-level containment: Box → Packet → Item. All nullable at the parent lev
 
 **Why `pair_group_id` on items, not a separate pairs table:** earrings/bangles are two physical pieces with potentially different weights, but sold and displayed as one product. One row per physical piece, linked by a shared group ID, keeps weight-based pricing accurate per piece while still letting the UI show them as a pair.
 
-**Why `huid_code` and `internal_code` are separate columns:** an item has exactly one active ID type — government HUID (mandatory over 2g) or an auto-generated 7-character fallback — never both. Reporting needs to know which kind of ID it's looking at.
+**Why `huid_code` and `internal_code` are separate columns:** an item has exactly one active ID type — government HUID (mandatory over 2g) or an auto-generated 5-character fallback (`Item::generateInternalCode()`, from a charset that excludes visually ambiguous characters like 0/O and 1/I, per the client's confirmed code-format requirement) — never both. Reporting needs to know which kind of ID it's looking at.
+
+**Why `items.metal` is a separate column from `purity`:** `purity` is a free-text field ("22K", "92.5") whose *format* depends on the metal, so it can't double as a filterable metal field. Stock filtering has to support metal type at minimum (confirmed requirement), hence the split.
+
+**Why `items.status` has `pending_review` and `reserved`, not just `in_stock`/`dispatched`/`sold`:** both are confirmed client rules, not internal conveniences. `pending_review` is where a karigar/hallmark return lands — admin is *exclusively* responsible for confirming it into real stock, so the item must be visibly distinct from both "still out" (`dispatched`) and "available" (`in_stock`) in the meantime. `reserved` is the same pattern applied to sales: a sale is only final once an admin verifies it, so the item can't show as `sold` (final) or `in_stock` (still sellable) between entry and verification.
+
+**Why `items.source_karigar_batch_id` / `source_purchase_item_id` exist:** raw material (from a karigar dispatch or a raw-material purchase) doesn't become a real, taggable item until someone processes the return/purchase line — these columns are the paper trail back to whichever raw source produced a given tagged item, without forcing every item to go through the same creation path.
 
 ### Movements — `movements`
 
@@ -53,7 +59,11 @@ Three-level containment: Box → Packet → Item. All nullable at the parent lev
 - One cleanup job handles all photo expiry, not seven
 - A new movement type is a new enum value, not a new table
 
-**Why rows are never updated or deleted:** every dispatch and return is its own row. A correction is a new row (`movement_type = 'correction'`, `reverses_movement_id` pointing at the mistake, `approved_by` set to the owner's user ID) — the original is never touched. This is the actual mechanism behind "no tampering," not just a label on the table.
+**Why rows are never updated or deleted:** every dispatch and return is its own row. A correction is a new row (`movement_type = 'correction'`, `reverses_movement_id` pointing at the mistake, `approved_by` set to the owner's user ID) — the original is never touched. This is the actual mechanism behind "no tampering," not just a label on the table. The one exception is the Pending Review confirm action, which sets `approved_by` on the return movement itself (not a correction) — that's an admin recording their review, the same field doing the job it was designed for, not a backdoor edit.
+
+**Why karigar raw-material and customer-material flows aren't just more `movements` rows:** the polymorphic `movements` table assumes the thing that goes out is the same thing that comes back (an item, packet, or box with a stable ID). Two of the three confirmed karigar-dispatch sub-flows break that assumption — a customer's own untagged material has no item ID at all, and raw metal issued to a karigar can come back as several separate finished pieces from one dispatch. Forcing either into `movements` would mean inventing a fake item row before one physically exists. `customer_material_jobs` and `karigar_raw_batches` exist instead, each shaped for what it actually tracks.
+
+**Why weight loss is a manual field, never computed:** `movements.weight_loss` (and `weight_at_return`) are entered by staff at return time. The client was explicit that wastage on karigar/hallmark returns is expected and normal, but the shop's own measurement is what's authoritative — not `weight_at_dispatch - weight_at_return` computed after the fact, which could disagree with what was actually weighed.
 
 ### Pricing — `rate_logs`
 
@@ -71,9 +81,17 @@ This is why a single rate update reprices the entire catalog instantly — there
 
 GST fields (`cgst`, `sgst`, `igst`, `invoice_number`) are split, not a flat total, because GST law requires the split shown on the invoice and requires sequential, gap-free invoice numbering per financial year.
 
+**Why a sale isn't final at entry:** the client confirmed a sale only becomes final once an admin verifies it — the item shouldn't disappear from live availability the moment staff enters the sale, only once admin confirms. Rather than a separate locking table, this reuses the same `items.status` mechanism already doing this job elsewhere (`pending_review`): items go to `reserved` on entry, and the Sale Verification Queue is the only thing that flips them to `sold` (and sets `sales.confirmed_by_accountant` — the one field on `sales` that's allowed to change after insert, for exactly this reason).
+
+### Custom Orders — `orders`
+
+A distinct lifecycle from Sales, not a sale sub-type — an order is a pre-commitment (placed → confirmed → ready → delivered → cancelled) that later *converts into* a sale (`converted_sale_id`), rather than being one. Rate-locking lives here, not on `sales`: if the customer paid in full at order time, `locked_rate`/`locked_at` freeze what the price will be; otherwise nothing is frozen and the rate at delivery applies. `out_of_stock` + nullable `in_stock_item_id` let an order exist against a product that doesn't physically exist yet.
+
 ### Purchases — `vendors`, `purchases`, `purchase_items`
 
 Separate from `movements` on purpose. **Movements answer "where is it physically"; purchases answer "what do we owe for it."** A karigar delivering finished goods is both a `karigar_in` movement and a `purchase` — conflating the two would make vendor payables untrackable independent of stock location.
+
+**Why `purchase_items` needed restructuring:** the original composite `(purchase_id, item_id)` primary key assumed every purchase line has a real item at the moment of purchase. Raw-material purchases don't — the vendor delivers untagged metal, described but not yet a taggable `Item`. `purchase_items` now has its own `id`, a nullable `item_id`, and description/category/metal/purity/`tag_pending` fields so a raw-material line can exist before tagging, then get its `item_id` filled in once staff tag it in Stock — updating a `purchase_items` row this way is fine; the parent `purchases` row itself is still never touched after insert.
 
 ### Accounting Ledger — `accounts`, `transactions`
 
@@ -95,6 +113,14 @@ Loyalty is a ledger (`loyalty_transactions`), not a running counter, for the sam
 
 **Customer portal auth is fully separate** from staff auth — see Section 3 of `SCHEMA_REFERENCE.md`. A customer logs in with phone+password on the `customer` guard and can never reach staff-only routes; the two tables (`users` vs `customers`) are never merged.
 
+### Old Gold/Silver Exchange & Refinery — `exchange_transactions`, `refinery_batches`
+
+The exchange flow is a client-mandated 4-step guided process (gross weight → net weight after melt → two independent purity readings, auto-averaged → preset deduction) that the client was explicit must never be abstracted or combined — so `exchange_transactions` has a column for every one of those steps individually rather than a generic "readings" JSON blob, and `stage` tracks which step a given transaction has reached. Refinery is a simpler out/in round-trip (scrap sent, refined weight+purity comes back) and got its own table since its fields genuinely differ from the exchange flow, even though both are conceptually "batch out, batch in."
+
+### Notifications — `pending_notifications`
+
+WhatsApp auto-send isn't in scope this phase, so every customer-facing message (sale confirmed, order ready, loyalty awarded, installment due, exchange valuation ready) follows one shared pattern instead of a bespoke integration per type: the triggering action generates a row with a ready-to-copy `message`, staff copies it into WhatsApp/SMS themselves, then marks it `sent`. One generic table with a `type` enum, rather than a table per message type, because the underlying action (generate → copy → send → mark sent) is identical regardless of what triggered it.
+
 ### Activity Log — via `spatie/laravel-activitylog`
 
 Every write to `movements`, `sales`, `purchases` is attributed to an authenticated `user_id` and logged with IP and timestamp. This — combined with never allowing hard edits — is what actually delivers "no tampering," not the movements table alone.
@@ -103,33 +129,26 @@ Every write to `movements`, `sales`, `purchases` is attributed to an authenticat
 
 ## 4. The Scaffold — What's Actually Built vs. What's Next
 
-**Built:**
-- All 24 migrations (schema in `SCHEMA_REFERENCE.md`, fully in place — includes the `jobs`/`job_batches`/`failed_jobs` tables required by the `database` queue driver)
-- Models, organized by domain folder (`app/Models/Stock/`, `Movement/`, `Sales/`, `Purchase/`, `Accounting/`, `Customer/`, `Pricing/`)
-- `PricingService` (with discount rules applied), `PhotoCompressionService`, `RateFetchService`, `LoyaltyService`
-- 3 scheduled console commands (photo cleanup, rate fetch, disk usage alert) — all wired through `routes/console.php` so a single cron entry drives everything
-- **Stock module**, fully live: `BoxManager`, `PacketManager`, `ItemManager`
-- **Admin module**, fully live: `EmployeeManager`, `UserManager`, `RoleManager`, `LoyaltySettingsManager`, `ReferralOverview`, `CustomerManager` (creates customers, sets/resets portal passwords — the only way customers get portal access, by design)
-- **Customer portal**, fully live: phone+password login, dashboard with Purchases/Loyalty/Installments tabs, referral list — runs on its own minimal layout (`components/layouts/guest.blade.php`), never Breeze's staff-assuming default
-- **Wireframes**, static: all 13 client-approved screens, reference-only, no logic
+Every module listed in `CLAUDE.md`'s Build status table is live, wired to a real table, and UI-consistent (see `docs/DESIGN_SYSTEM.md`). What's still genuinely open is a short, specific list — not "which modules exist" but a few unresolved business questions and one piece of automation:
 
-**Four setup steps that live outside our generated files** — required once on any fresh clone, see `README.md`'s "Setup steps required that no file can automate" section: Spatie middleware aliases in `bootstrap/app.php`, the `customer` guard in `config/auth.php`, running `breeze:install` (not just requiring the package), and re-applying `LoginRequest.php` after any Breeze reinstall.
+- **Vendor payable auto-trigger** — does a karigar raw-material dispatch automatically create an amount owed to that karigar, or is that always a separate manual purchase entry? Not automated either way yet; `karigar_raw_batches` doesn't currently write anything to `purchases`/`transactions`.
+- **Pricing calculation mechanics** — `PricingService` and the making-charge config are provisional pending the client's own Excel sheet showing their actual calculation logic.
+- **Custom-order expiry** — the ~2.5-month uncollected-order-releases-to-stock rule has no confirmed timing or customer-warning process, so it isn't implemented.
+- **Accounting ledger auto-posting** — `transactions` rows aren't yet auto-written from Sales/Purchases; the ledger view itself is live but reads whatever's manually entered.
+- **Karigar raw-material multi-piece splits** — one dispatch returning as several finished pieces is only partially built (one new item per return works; a repeatable multi-line split doesn't yet), pending client confirmation of exactly how that should work and who assigns tags.
 
-**Not built yet — build in this order, each depends on the last:**
-1. **Movements module** — live version of KarigarDispatch, KarigarReturn, ExternalMovement, MoveStock, ScanStock. Depends on Stock (done).
-2. **Sales module** — live billing screen, GST invoice generation. This is also where `LoyaltyService::awardForSale()` gets wired in and where the manual `sales.discount` stacks on top of automatic `discount_rules`. Depends on Movements (for item status).
-3. **Purchases + Vendor module**
-4. **Accounting ledger wiring** — auto-write `transactions` rows from Sales/Purchases
-5. **Dashboard, History, Logbook, Location Report, Audit Log viewer** — mostly read-only aggregation views, build last since they depend on everything else having real data
+Full detail and context for each: `docs/REQUIREMENTS.md`'s "Still open" section.
 
-**Why this order:** every later module reads from Items and Movements. Building Sales before Movements works exist would mean faking "current item status," which then needs rework once Movements is real.
+**Four setup steps that live outside generated files** — required once on any fresh clone, see `README.md`: Spatie middleware aliases in `bootstrap/app.php`, the `customer` guard in `config/auth.php`, running `breeze:install` (not just requiring the package), and re-applying `LoginRequest.php` after any Breeze reinstall.
 
 ---
 
 ## 5. Non-Negotiable Rules When Extending This
 
-- **Never `UPDATE` or `DELETE` a `movements`, `sales`, or `purchases` row.** Corrections are new rows referencing the original.
+- **Never `UPDATE` or `DELETE` a `movements`, `sales`, or `purchases` row**, except the two narrow, intentional cases the schema was built around: `sales.confirmed_by_accountant` (set once, by an admin, on verification) and a movement's `approved_by` (set once, by an admin, on Pending Review confirm). Corrections are otherwise always new rows referencing the original.
 - **Never store a calculated price** except in `sale_items.price_at_sale`, which is a deliberate snapshot.
 - **Every write needs a `user_id`.** No anonymous or shared-login actions anywhere.
 - **Photos go through `PhotoCompressionService`.** Never save an uploaded file directly — WebP + resize is what keeps disk usage bounded.
 - **New async work goes through the queue (`database` driver), not the request cycle.** Anything slow (compression, WhatsApp, exports) blocks a staff member on a phone otherwise.
+- **Never self-wrap a full-page Livewire component's Blade view in `<x-layouts.app>`.** Set the layout from PHP (`->layout('components.layouts.app', [...])`) instead — see `CLAUDE.md`'s "Livewire double-layout trap." Getting this wrong breaks every interactive action on the page, not just the initial load.
+- **Internal item codes always come from `Item::generateInternalCode()`.** Never hand-roll a second `Str::random(...)`-based generator — the client's non-ambiguous-character requirement lives in exactly one place.

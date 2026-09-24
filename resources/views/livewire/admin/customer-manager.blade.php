@@ -1,98 +1,91 @@
-<x-layouts.app title="Customers — Radharani Jewellery">
 <div>
-    <div class="rj-serif" style="font-size:24px;margin-bottom:4px;">Customers</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:24px;">Directory, plus portal password assignment — customers cannot self-register.</div>
+    <x-ui.page-header title="Customers" subtitle="Directory, plus portal password assignment — customers cannot self-register." />
 
     @if (session('message'))
-        <div class="rj-flash">{{ session('message') }}</div>
+        <div class="bg-success-bg text-success rounded-control px-3.5 py-2.5 mb-5 text-sm">{{ session('message') }}</div>
     @endif
 
-    <div class="rj-card" style="margin-bottom:24px;">
-        <div style="font-weight:700;font-size:14px;margin-bottom:14px;">{{ $editingId ? 'Edit Customer' : 'New Customer' }}</div>
-        <form wire:submit="save" style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;">
+    <x-ui.card class="mb-6">
+        <div class="font-semibold text-sm text-ink_text-primary mb-3.5">{{ $editingId ? 'Edit Customer' : 'New Customer' }}</div>
+        <form wire:submit="save" class="grid grid-cols-3 gap-3.5">
             <div>
-                <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;">Name</label>
-                <input type="text" wire:model="name" class="rj-input" style="width:100%;">
-                @error('name') <div style="color:#B04A3C;font-size:11px;margin-top:3px;">{{ $message }}</div> @enderror
+                <label class="block text-[11.5px] text-ink_text-secondary mb-1">Name</label>
+                <input type="text" wire:model="name" class="rj-input w-full">
+                @error('name') <div class="text-danger text-[11px] mt-1">{{ $message }}</div> @enderror
             </div>
             <div>
-                <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;">Phone</label>
-                <input type="text" wire:model="phone" class="rj-input" style="width:100%;">
-                @error('phone') <div style="color:#B04A3C;font-size:11px;margin-top:3px;">{{ $message }}</div> @enderror
+                <label class="block text-[11.5px] text-ink_text-secondary mb-1">Phone</label>
+                <input type="text" wire:model="phone" class="rj-input w-full">
+                @error('phone') <div class="text-danger text-[11px] mt-1">{{ $message }}</div> @enderror
             </div>
             <div>
-                <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;">Email</label>
-                <input type="email" wire:model="email" class="rj-input" style="width:100%;">
+                <label class="block text-[11.5px] text-ink_text-secondary mb-1">Email</label>
+                <input type="email" wire:model="email" class="rj-input w-full">
             </div>
-            <div style="grid-column:span 2;">
-                <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;">Address</label>
-                <input type="text" wire:model="address" class="rj-input" style="width:100%;">
-            </div>
-            <div>
-                <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;">GSTIN (optional)</label>
-                <input type="text" wire:model="gstin" class="rj-input" style="width:100%;">
+            <div class="col-span-2">
+                <label class="block text-[11.5px] text-ink_text-secondary mb-1">Address</label>
+                <input type="text" wire:model="address" class="rj-input w-full">
             </div>
             <div>
-                <label style="display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;">Status</label>
-                <select wire:model="status" class="rj-select" style="width:100%;">
+                <label class="block text-[11.5px] text-ink_text-secondary mb-1">GSTIN (optional)</label>
+                <input type="text" wire:model="gstin" class="rj-input w-full">
+            </div>
+            <div>
+                <label class="block text-[11.5px] text-ink_text-secondary mb-1">Status</label>
+                <select wire:model="status" class="rj-select w-full">
                     <option value="past_customer">Past Customer</option>
                     <option value="order_given">Order Given</option>
                     <option value="order_pending">Order Pending</option>
                 </select>
             </div>
-            <div style="grid-column:1/-1;display:flex;gap:10px;">
-                <button type="submit" class="rj-btn-primary">Save</button>
+            <div class="col-span-full flex gap-2.5">
+                <x-ui.button type="submit" variant="primary">Save</x-ui.button>
                 @if ($editingId)
-                    <button type="button" wire:click="cancel" class="rj-btn-secondary">Cancel</button>
+                    <x-ui.button type="button" wire:click="cancel" variant="secondary">Cancel</x-ui.button>
                 @endif
             </div>
         </form>
-    </div>
+    </x-ui.card>
 
     @if ($showPasswordFor)
-        <div class="rj-card" style="margin-bottom:24px;max-width:400px;">
-            <div style="font-weight:700;font-size:14px;margin-bottom:10px;">Set Portal Password</div>
-            <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Share this password with the customer directly — there is no reset-by-email flow yet.</div>
-            <input type="text" wire:model="newPassword" class="rj-input" style="width:100%;margin-bottom:10px;" placeholder="New password (min 8 characters)">
-            @error('newPassword') <div style="color:#B04A3C;font-size:11px;margin-bottom:8px;">{{ $message }}</div> @enderror
-            <div style="display:flex;gap:10px;">
-                <button wire:click="setPassword" class="rj-btn-primary">Set Password</button>
-                <button wire:click="$set('showPasswordFor', false)" class="rj-btn-secondary">Cancel</button>
+        <x-ui.card class="mb-6 max-w-[400px]">
+            <div class="font-semibold text-sm text-ink_text-primary mb-2.5">Set Portal Password</div>
+            <div class="text-xs text-ink_text-secondary mb-3">Share this password with the customer directly — there is no reset-by-email flow yet.</div>
+            <input type="text" wire:model="newPassword" class="rj-input w-full mb-2.5" placeholder="New password (min 8 characters)">
+            @error('newPassword') <div class="text-danger text-[11px] mb-2">{{ $message }}</div> @enderror
+            <div class="flex gap-2.5">
+                <x-ui.button wire:click="setPassword" variant="primary">Set Password</x-ui.button>
+                <x-ui.button wire:click="$set('showPasswordFor', false)" variant="secondary">Cancel</x-ui.button>
             </div>
-        </div>
+        </x-ui.card>
     @endif
 
-    <input type="text" wire:model.live.debounce.300ms="search" placeholder="Search customers..."
-        class="rj-input" style="margin-bottom:14px;width:280px;">
-
-    <div class="rj-card" style="padding:0;overflow:hidden;">
-        <table class="rj-table">
-            <thead>
-                <tr>
-                    <th style="padding-left:20px;">Name</th><th>Phone</th><th>Referral Code</th>
-                    <th>Portal Access</th><th>Status</th><th style="padding-right:20px;"></th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach ($customers as $customer)
-                    <tr>
-                        <td style="padding-left:20px;font-weight:600;">{{ $customer->name }}</td>
-                        <td>{{ $customer->phone }}</td>
-                        <td>{{ $customer->referral_code }}</td>
-                        <td>{{ $customer->password ? 'Enabled' : 'Not set' }}</td>
-                        <td><span class="rj-tag rj-tag-stock">{{ strtoupper(str_replace('_',' ',$customer->status)) }}</span></td>
-                        <td style="padding-right:20px;text-align:right;white-space:nowrap;">
-                            <button wire:click="edit({{ $customer->id }})" style="background:none;border:none;color:var(--accent);font-weight:700;font-size:12.5px;cursor:pointer;">Edit</button>
-                            <button wire:click="openPasswordForm({{ $customer->id }})" style="background:none;border:none;color:#8A5F22;font-weight:600;font-size:12.5px;cursor:pointer;margin-left:10px;">
-                                {{ $customer->password ? 'Reset' : 'Set' }} Password
-                            </button>
-                        </td>
-                    </tr>
-                @endforeach
-            </tbody>
-        </table>
+    <div class="flex justify-between items-center mb-3.5">
+        <input type="text" wire:model.live.debounce.300ms="search" placeholder="Search customers..."
+            class="rj-input w-[280px]">
+        <a href="{{ route('admin.customers.import') }}" wire:navigate><x-ui.button variant="secondary">Bulk Import</x-ui.button></a>
     </div>
 
-    <div style="margin-top:16px;">{{ $customers->links() }}</div>
+    <x-ui.card class="!p-0 overflow-hidden">
+        <x-ui.table :headers="['Name', 'Phone', 'Referral Code', 'Portal Access', 'Status', '']">
+            @foreach ($customers as $customer)
+                <tr class="h-[60px] border-b border-line-light">
+                    <td class="px-4 font-semibold text-ink_text-primary">{{ $customer->name }}</td>
+                    <td class="px-4 text-ink_text-primary">{{ $customer->phone }}</td>
+                    <td class="px-4 text-ink_text-primary">{{ $customer->referral_code }}</td>
+                    <td class="px-4 text-ink_text-primary">{{ $customer->password ? 'Enabled' : 'Not set' }}</td>
+                    <td class="px-4"><x-ui.badge tone="success">{{ strtoupper(str_replace('_',' ',$customer->status)) }}</x-ui.badge></td>
+                    <td class="px-4 text-right whitespace-nowrap">
+                        <a href="{{ route('admin.customers.detail', $customer) }}" wire:navigate class="text-gold font-semibold text-xs mr-3.5">Detail</a>
+                        <button wire:click="edit({{ $customer->id }})" class="bg-transparent border-0 text-gold font-semibold text-xs cursor-pointer mr-3.5">Edit</button>
+                        <button wire:click="openPasswordForm({{ $customer->id }})" class="bg-transparent border-0 text-warning font-semibold text-xs cursor-pointer">
+                            {{ $customer->password ? 'Reset' : 'Set' }} Password
+                        </button>
+                    </td>
+                </tr>
+            @endforeach
+        </x-ui.table>
+    </x-ui.card>
+
+    <div class="mt-4">{{ $customers->links() }}</div>
 </div>
-</x-layouts.app>

@@ -7,6 +7,10 @@ use App\Models\User;
 class Transaction extends Model
 {
     public $timestamps = false;
+    // $timestamps=false also disables Eloquent's default created_at
+    // date-casting, so it needs an explicit cast or ->format() calls on it
+    // (Ledger View) fatal-error on a raw string.
+    protected $casts = ['created_at' => 'datetime'];
     protected $fillable = [
         'account_id', 'reference_type', 'reference_id', 'debit', 'credit', 'created_by',
     ];

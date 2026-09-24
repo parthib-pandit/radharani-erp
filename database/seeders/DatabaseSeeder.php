@@ -24,5 +24,9 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Owner', 'password' => bcrypt('password'), 'is_active' => true]
         );
         $owner->assignRole('owner');
+
+        if (app()->environment(['local', 'testing'])) {
+            $this->call(DemoDataSeeder::class);
+        }
     }
 }

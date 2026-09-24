@@ -1,0 +1,74 @@
+<?php
+namespace App\Livewire\Installments;
+
+use App\Models\Customer\InstallmentPayment;
+use App\Models\Customer\InstallmentScheme;
+use App\Models\Notification\PendingNotification;
+use Livewire\Component;
+
+class MonthlyPaymentStatus extends Component
+{
+    public ?string $justMarked = null;
+
+    // "Due" reminder — the moment this month's instalment is outstanding,
+    // not yet the moment it's paid. Kept separate from markPaid() so a
+    // reminder queues once per month, independent of when/whether the
+    // payment eventually gets recorded.
+    public function sendReminder(int $schemeId)
+    {
+        $scheme = InstallmentScheme::with('customer')->findOrFail($schemeId);
+
+        PendingNotification::create([
+            'customer_id' => $scheme->customer_id,
+            'type' => 'installment_reminder',
+            'recipient_name' => $scheme->customer->name ?? null,
+            'recipient_phone' => $scheme->customer->phone ?? null,
+            'message' => "Your monthly instalment of ₹" . number_format($scheme->monthly_amount, 2) . ' is due.',
+            'status' => 'pending',
+            'related_type' => 'installment_scheme',
+            'related_id' => $scheme->id,
+            'created_by' => auth()->id(),
+        ]);
+
+        $this->justMarked = "Reminder queued for {$scheme->customer->name}'s " . now()->format('F Y') . ' instalment.';
+    }
+
+    public function markPaid(int $schemeId)
+    {
+        $scheme = InstallmentScheme::findOrFail($schemeId);
+
+        $alreadyPaidThisMonth = $scheme->payments()
+            ->whereYear('paid_on', now()->year)
+            ->whereMonth('paid_on', now()->month)
+            ->exists();
+
+        if ($alreadyPaidThisMonth) {
+            return;
+        }
+
+        InstallmentPayment::create([
+            'scheme_id' => $scheme->id,
+            'amount' => $scheme->monthly_amount,
+            'paid_on' => now()->toDateString(),
+        ]);
+
+        $scheme->increment('months_paid');
+        $this->justMarked = "Marked {$scheme->customer->name}'s installment as paid for " . now()->format('F Y') . '.';
+    }
+
+    public function render()
+    {
+        $schemes = InstallmentScheme::with(['customer', 'payments' => function ($q) {
+            $q->whereYear('paid_on', now()->year)->whereMonth('paid_on', now()->month);
+        }])
+            ->where('status', 'active')
+            ->get()
+            ->map(function ($scheme) {
+                $scheme->paidThisMonth = $scheme->payments->isNotEmpty();
+                return $scheme;
+            });
+
+        return view('livewire.installments.monthly-payment-status', ['schemes' => $schemes])
+            ->layout('components.layouts.app', ['title' => 'Monthly Payment Status — Radharani Jewellery ERP']);
+    }
+}

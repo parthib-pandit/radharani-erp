@@ -3,45 +3,37 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Radharani Jewellery Works</title>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Public+Sans:wght@400;500;600;700&display=swap');
-*{box-sizing:border-box;}
-body{margin:0;font-family:'Public Sans',-apple-system,BlinkMacSystemFont,sans-serif;background:#FAF8F4;color:#211D19;}
-a{color:inherit;text-decoration:none;}
-.rj-serif{font-family:'Newsreader',Georgia,serif;}
-.rj-card{background:#FFFFFF;border:1px solid #E7E0D4;border-radius:12px;transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease;}
-.rj-card:hover{border-color:#A9772F;box-shadow:0 6px 18px rgba(28,24,21,0.06);transform:translateY(-1px);}
-.wrap{max-width:720px;margin:0 auto;padding:100px 24px 80px;text-align:center;}
-</style>
+<title>Radharani Jewellery ERP</title>
+@vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body>
-<div class="wrap">
-  <div style="width:64px;height:64px;border-radius:50%;border:1.5px solid #A9772F;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;background:#1C1815;">
-    <span class="rj-serif" style="font-style:italic;font-size:30px;color:#A9772F;">R</span>
+<body class="font-sans antialiased bg-surface-bg text-ink_text-primary">
+<div class="max-w-[720px] mx-auto px-6 pt-24 pb-20 text-center">
+  <div class="w-16 h-16 rounded-full bg-ink flex items-center justify-center mx-auto mb-5">
+    <x-ui.icon name="gem" :size="28" class="text-gold" />
   </div>
 
-  <div class="rj-serif" style="font-size:34px;color:#211D19;">Radharani Jewellery Works</div>
-  <div style="font-size:13px;letter-spacing:.14em;color:#8B7F6F;text-transform:uppercase;margin-top:8px;">Stock Management &amp; Customer Portal</div>
+  <div class="text-[34px] font-bold">Radharani Jewellery ERP</div>
+  <div class="text-[13px] tracking-[.14em] text-ink_text-muted uppercase mt-2">Stock Management &amp; Customer Portal</div>
 
-  <div style="font-size:14px;color:#55504A;max-width:460px;margin:24px auto 40px;line-height:1.6;">
+  <div class="text-sm text-ink_text-secondary max-w-[460px] mx-auto mt-6 mb-10 leading-relaxed">
     Every piece tracked from vault to counter. Current gold and silver rates,
     reflected instantly across the collection.
   </div>
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:480px;margin:0 auto;">
-    <a href="{{ route('login') }}" class="rj-card" style="padding:24px 16px;">
-      <div style="font-size:15px;font-weight:700;color:#211D19;">Staff Login</div>
-      <div style="font-size:11.5px;color:#8B7F6F;margin-top:6px;">Inventory, movements &amp; sales</div>
+  <div class="grid grid-cols-2 gap-4 max-w-[480px] mx-auto">
+    <a href="{{ route('login') }}" class="bg-white border border-line rounded-card p-6 hover:border-gold hover:shadow-card hover:-translate-y-0.5 transition-all">
+      <div class="text-[15px] font-bold">Staff Login</div>
+      <div class="text-[11.5px] text-ink_text-secondary mt-1.5">Inventory, movements &amp; sales</div>
     </a>
-    <a href="{{ route('portal.login') }}" class="rj-card" style="padding:24px 16px;">
-      <div style="font-size:15px;font-weight:700;color:#211D19;">Customer Portal</div>
-      <div style="font-size:11.5px;color:#8B7F6F;margin-top:6px;">Purchases, loyalty &amp; installments</div>
+    <a href="{{ route('portal.login') }}" class="bg-white border border-line rounded-card p-6 hover:border-gold hover:shadow-card hover:-translate-y-0.5 transition-all">
+      <div class="text-[15px] font-bold">Customer Portal</div>
+      <div class="text-[11.5px] text-ink_text-secondary mt-1.5">Purchases, loyalty &amp; installments</div>
     </a>
   </div>
 
-  <div style="margin-top:56px;padding-top:20px;border-top:1px solid #E7E0D4;font-size:11.5px;color:#8B7F6F;">
+  <div class="mt-14 pt-5 border-t border-line text-[11.5px] text-ink_text-secondary">
     &copy; {{ date('Y') }} Radharani Jewellery Works
+    <div class="mt-1 text-[10.5px] text-ink_text-muted">Powered by Echocrew</div>
   </div>
 </div>
 </body>

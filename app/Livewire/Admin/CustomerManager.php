@@ -114,6 +114,6 @@ class CustomerManager extends Component
                 ->orWhere('phone', 'like', "%{$this->search}%")
                 ->orderByDesc('id')
                 ->paginate(15),
-        ]);
+        ])->layout('components.layouts.app', ['title' => 'Customers — Radharani Jewellery']);
     }
 }

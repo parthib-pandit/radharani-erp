@@ -1,6 +1,6 @@
 # Radharani Jewellery ERP — Finalized Schema Reference
 
-Single source of truth for every table as it currently stands in the scaffold (24 migrations). This supersedes the table-by-table sections scattered across earlier design docs — if anything conflicts, this file wins.
+Single source of truth for every table as it currently stands (36 migrations). This supersedes the table-by-table sections scattered across earlier design docs — if anything conflicts, this file wins. See `docs/REQUIREMENTS.md` for the confirmed business rules each new table/column exists to satisfy.
 
 ## ER Diagrams
 
@@ -10,7 +10,7 @@ Single source of truth for every table as it currently stands in the scaffold (2
 **Diagram 2 — Customer side:** Customers, Loyalty & Referral, Installments, Accounting Ledger
 ![ERD 2 — Customer, Loyalty, Accounting](./ERD-2-customer-loyalty-accounting.png)
 
-*Not shown in either diagram (standalone/reference tables, no hard FK relationships): `rate_logs`, `gst_rates`, `qr_codes`, `page_terms`. Full columns for these are below.*
+*Not shown in either diagram (added after the diagrams were drawn, or standalone/reference tables with no hard FK relationships): `rate_logs`, `gst_rates`, `qr_codes`, `page_terms`, `karigar_raw_batches`, `customer_material_jobs`, `exchange_transactions`, `refinery_batches`, `orders`, `pending_notifications`. Full columns for these are below.*
 
 *Keep both PNGs in the same folder as this file — the links above are relative.*
 
@@ -22,24 +22,52 @@ Single source of truth for every table as it currently stands in the scaffold (2
 
 **`employees`** — id, name, phone, address, designation, salary, joining_date, status(active/inactive)
 
-**`users`** — id, name, email, password, employee_id→employees(null), is_active, remember_token
+**`users`** — id, name, email, **phone(null,unique)**, password, employee_id→employees(null), is_active, remember_token
 *(+ password_reset_tokens, sessions — Laravel defaults, kept)*
+*`phone` added so staff can log in with phone or email (Requirement #19) — customer-portal login stays phone-only on the separate `customers` table.*
 
 **`boxes`** — id, code(unique), label
 
 **`packets`** — id, box_id→boxes(null), code(unique), label
 
-**`items`** — id, packet_id→packets(null), huid_code(null,idx), internal_code(null,idx), category, purity, weight, description, hsn_code(null), making_type(per_piece/percentage), making_value, pair_group_id(null), status(in_stock/dispatched/sold, idx)
+**`items`** — id, packet_id→packets(null), **metal(gold/silver/titanium/platinum, null)**, huid_code(null,idx), internal_code(null,idx), category, purity, weight, description, hsn_code(null), making_type(**percentage/flat_per_piece/flat_per_gram**), making_value, pair_group_id(null), **source_karigar_batch_id→karigar_raw_batches(null)**, **source_purchase_item_id→purchase_items(null)**, status(in_stock/dispatched/sold/**pending_review**/**reserved**, idx)
+*`metal` split out from the free-text `purity` string so stock can be filtered by metal type (Requirement #17). `making_type` widened from 2 to 3 values (Requirement #10). `status` gained `pending_review` (items returned from karigar/hallmark awaiting admin confirmation, Requirement #9) and `reserved` (items in an unverified sale, Requirement #12). `source_karigar_batch_id`/`source_purchase_item_id` link a newly-tagged item back to whichever raw source produced it — both null for normally-bought/made items.*
+*`internal_code` is always generated via `Item::generateInternalCode()` — 5 characters, from a curated charset that excludes visually ambiguous characters (0/O, 1/I, and lookalikes). Never hand-roll a second generator.*
 
 ---
 
 ## Movement Tracking
 
-**`movements`** — id, trackable_type(item/packet/box), trackable_id, movement_type(vault_out/in, karigar_out/in, hallmark_out/in, photo_out/in, custom_out/in, melt_out/in, correction), purpose_label(null), user_id→users, counterparty(null), expected_return(null), actual_return(null), weight_at_dispatch(null), photo_path(null), bill_path(null), note(null), reverses_movement_id→movements(null), approved_by→users(null)
+**`movements`** — id, trackable_type(item/packet/box), trackable_id, movement_type(vault_out/in, karigar_out/in, hallmark_out/in, photo_out/in, custom_out/in, melt_out/in, correction), purpose_label(null), user_id→users, counterparty(null), expected_return(null), actual_return(null), weight_at_dispatch(null), **weight_at_return(null)**, **weight_loss(null)**, **tagged_by(null)**, photo_path(null), bill_path(null), note(null), reverses_movement_id→movements(null), approved_by→users(null)
 *idx: (trackable_type, trackable_id, created_at), (movement_type, created_at)*
+*`weight_at_return`/`weight_loss` capture the manually-entered weight at return and the loss figure (Requirement #6 — never auto-calculated). `tagged_by` is free text recording who performed hallmark tagging on return (Requirement #8) — may be an external hallmarking-centre person, so it's not a `users` FK.*
 
-**`rate_logs`** — id, metal(gold/silver), rate, source(manual/api), updated_by→users(null), created_at
+**`karigar_raw_batches`** — id, vendor_id→vendors, weight_out, metal(gold/silver/titanium/platinum), purity(null), purpose_label(null), expected_return(null), actual_return(null), status(dispatched/partially_returned/returned, idx), note(null), user_id→users
+*Karigar raw-material sub-flow (Requirement #5c): raw metal issued, finished untagged product(s) returned. Kept separate from `movements` because what leaves and what returns are not the same physical thing. Current implementation supports one new `Item` per return (linked via `items.source_karigar_batch_id`) — multi-piece splitting per batch is still open, see `docs/REQUIREMENTS.md`.*
+
+**`customer_material_jobs`** — id, customer_id→customers, vendor_id→vendors, description, weight_out, metal(gold/silver/titanium/platinum), expected_return(null), actual_return(null), weight_in(null), weight_loss(null), status(out/returned, idx), note(null), user_id→users
+*Karigar customer-material sub-flow (Requirement #5b): a customer's own untagged gold/silver sent for repair. Never shop stock — has no item ID — so it can't go through `movements` (item/packet/box only) or `karigar_raw_batches` (shop-owned raw material). Tracked against the customer directly.*
+
+**`rate_logs`** — id, metal(**gold/silver/titanium/platinum**), rate, source(manual/api), updated_by→users(null), created_at
 *idx: (metal, created_at)*
+*Enum widened alongside `items.metal`.*
+
+---
+
+## Old Gold/Silver Exchange & Refinery
+
+**`exchange_transactions`** — id, customer_id→customers, gross_weight, description(null), net_weight(null), purity_test_1(null), purity_test_2(null), purity_averaged(null), preset_deduction_percent(default 2.00), deductable_weight(null), stage(received/melted/tested/valued/settled, idx), final_value(null), settled_by→users(null), settled_at(null), created_by→users
+*The client's exact 4-step guided process (gross weight → net weight after melt → two independent purity readings, auto-averaged → preset deduction → valuation), confirmed as never to be abstracted or combined into fewer steps. `stage` tracks progress for the Status Tracker screen.*
+
+**`refinery_batches`** — id, weight, photo_path(null), status(sent/returned, idx), refined_weight(null), refined_purity(null), sent_at(null), returned_at(null), created_by→users
+*Simple out/in round-trip: accumulated scrap sent to an external refinery, refined material with a purity reading comes back. Photos go through `PhotoCompressionService`.*
+
+---
+
+## Custom Orders
+
+**`orders`** — id, customer_id→customers, product_description, category(null), metal(gold/silver/titanium/platinum, null), estimated_weight(null), estimated_value, advance_amount(default 0), full_payment_now(default false), rate_locked(default false), locked_rate(null), locked_at(null), in_stock_item_id→items(null), out_of_stock(default false), status(placed/confirmed/ready/delivered/cancelled, idx), expected_ready_date(null), converted_sale_id→sales(null), created_by→users
+*A distinct lifecycle from Sales, not a sale sub-type — a pre-commitment that later converts into a sale. Rate-locking (Requirement #11): if `full_payment_now` was true at entry, `rate_locked`/`locked_rate`/`locked_at` freeze the rate at order time; otherwise the rate at delivery applies (nothing frozen). `out_of_stock` supports ordering a product not currently in stock; `in_stock_item_id` links to a real item when one exists.*
 
 ---
 
@@ -56,25 +84,28 @@ Single source of truth for every table as it currently stands in the scaffold (2
 ## Customers, Loyalty & Referral
 
 **`customers`** — id, name, phone(idx), address(null), email(null), **password(null)**, **remember_token**, gstin(null), balance, status(past_customer/order_given/order_pending), loyalty_points, referral_code(unique,null), referred_by→customers(null), imported_from_tally
-*Authenticatable — logs into the separate `customer` guard via phone+password.*
+*Authenticatable — logs into the separate `customer` guard via phone+password (Requirement #14).*
 
 **`loyalty_settings`** — id, points_per_rupee(default 0.001), referral_bonus_points(default 100), min_redeemable_points(default 0), point_value_in_rupees(default 1), updated_by→users(null)
-*Single-row config table — always accessed via `LoyaltySetting::current()`.*
+*Single-row config table — always accessed via `LoyaltySetting::current()`. Not actually used for auto-calculation (Requirement #15 — loyalty is fully manual); kept for reference/possible future use.*
 
 **`loyalty_transactions`** — id, customer_id→customers, points(+/-), reason(purchase/referral/redemption), related_sale_id→sales(null)
-*Append-only ledger — `customers.loyalty_points` is a cached total derived from this.*
+*Append-only ledger — `customers.loyalty_points` is a cached total derived from this. Awards and redemptions are manual entries (Requirement #15), not calculated.*
 
 **`installment_schemes`** — id, customer_id→customers, monthly_amount, months_paid, start_date, status(active/completed/defaulted)
 
 **`installment_payments`** — id, scheme_id→installment_schemes, amount, paid_on
+*Fully manual — no automatic payment detection (Requirement #15).*
 
 ---
 
 ## Sales & Billing
 
 **`sales`** — id, customer_id→customers, invoice_number(unique), type(sale/order_delivery), cgst, sgst, igst, additional_charges(json,null), discount(default 0), payment_modes(json,null), accountant_note(null), total, confirmed_by_accountant(default false), created_by→users
+*Insert-only except `confirmed_by_accountant`, which an admin sets exactly once via the Sale Verification Queue (Requirement #12) — the one narrow, intentional exception to "never update a sales row."*
 
 **`sale_items`** — sale_id→sales, item_id→items, price_at_sale — *composite PK, price frozen permanently at time of sale*
+*On sale entry, each item's `items.status` is set to `reserved`, not `sold` — verification is what flips it to `sold`.*
 
 ---
 
@@ -82,9 +113,11 @@ Single source of truth for every table as it currently stands in the scaffold (2
 
 **`vendors`** — id, name, type(karigar/supplier/hallmark_center), phone(null), address(null), balance
 
-**`purchases`** — id, vendor_id→vendors, invoice_number(null), total_weight(null), total_amount, gst(null), payment_status(paid/partial/pending), created_by→users
+**`purchases`** — id, vendor_id→vendors, **type(finished_product/raw_material, default finished_product)**, invoice_number(null), total_weight(null), total_amount, gst(null), payment_status(paid/partial/pending), created_by→users
+*`type` added (Requirement #13) — finished-product purchases attach real tagged items; raw-material purchases attach description-only lines that get tagged later.*
 
-**`purchase_items`** — purchase_id→purchases, item_id→items, rate, weight — *composite PK*
+**`purchase_items`** — **id(own PK, was composite purchase_id+item_id)**, purchase_id→purchases, item_id→items(**nullable**), **description(null)**, **category(null)**, **metal(null)**, **purity(null)**, **tag_pending(default false)**, rate, weight
+*Restructured to support raw-material lines that have no item yet at entry time: `item_id` is nullable, `tag_pending=true` marks a line as "still needs tagging," and `description`/`category`/`metal`/`purity` describe what was bought before it becomes a real item. When staff later tag it (Stock → Items → Pending Tags), the line's `item_id` is filled in and `tag_pending` flips false — this is a `purchase_items` update, which is fine; `purchases` rows themselves are still never updated.*
 
 ---
 
@@ -93,6 +126,14 @@ Single source of truth for every table as it currently stands in the scaffold (2
 **`accounts`** — id, name, type(asset/liability/income/expense)
 
 **`transactions`** — id, account_id→accounts, reference_type(sale/purchase/installment/manual), reference_id(null), debit(default 0), credit(default 0), created_by→users
+*Auto-write-on-sale/purchase is not yet wired — see `docs/DEVELOPER_GUIDE.md` and `CLAUDE.md`'s build status.*
+
+---
+
+## Notifications
+
+**`pending_notifications`** — id, customer_id→customers(null), type(sale_confirmation/order_ready/loyalty_award/installment_reminder/exchange_valuation_ready/other), recipient_name(null), recipient_phone(null), message, status(pending/sent, idx), sent_by→users(null), sent_at(null), related_type(null), related_id(null), created_by→users(null)
+*One shared, generic table across every customer-facing message type (Requirement #16 — no WhatsApp auto-send this phase). A triggering action (sale verified, order marked ready, loyalty awarded, installment due) generates a row with a ready-to-copy `message`; staff copies it out manually and marks it `sent`. `related_type`/`related_id` optionally point back at the record that triggered it, without a rigid FK per type.*
 
 ---
 
@@ -100,6 +141,7 @@ Single source of truth for every table as it currently stands in the scaffold (2
 
 **`qr_codes`** — id, target_type(item/packet/box), target_id, code, file_path(null)
 *idx: (target_type, target_id)*
+*Packets get QR codes too, not just boxes (Requirement #1) — already supported by `target_type` including `packet`.*
 
 ---
 
@@ -116,7 +158,8 @@ Standard package tables: `roles`, `permissions`, `model_has_roles`, `model_has_p
 
 **Seeded roles** (`RolePermissionSeeder`): `owner` (all permissions), `manager`, `accountant`, `counter_staff`, `karigar_handler` — each scoped, see seeder for exact permission lists.
 
-**Full permission list:** `stock.manage`, `movement.create`, `movement.approve`, `sale.create`, `sale.approve`, `purchase.manage`, `rate.update`, `ledger.view`, `employee.manage`, `user.manage`, `role.manage`, `audit.view`, `discount.manage`, `loyalty.manage`
+**Full permission list:** `stock.manage`, `movement.create`, `movement.approve`, `sale.create`, `sale.approve`, `purchase.manage`, `rate.update`, `ledger.view`, `employee.manage`, `user.manage`, `role.manage`, `audit.view`, `discount.manage`, `loyalty.manage`, `customer.manage`
+*`movement.approve` gates the Pending Review queue's confirm action (Requirement #9).*
 
 ## Activity Log (via `spatie/laravel-activitylog`)
 
@@ -130,7 +173,7 @@ Standard package table: `activity_log`. Captures every write on `movements`/`sal
 |---|---|---|
 | Table | `users` | `customers` |
 | Guard | `web` | `customer` |
-| Login field | email | phone |
+| Login field | email **or phone** | phone only |
 | Roles/permissions | Yes (Spatie) | No — customers never get staff roles |
 | Portal | `/admin/*`, `/stock/*` | `/portal/*` |
 
@@ -144,18 +187,29 @@ A customer must never be promoted to a `users` row, and vice versa — they're s
 employees ──< users ──< movements (as user_id, approved_by)
                   │
                   ├──< sales (as created_by)
-                  └──< purchases (as created_by)
+                  ├──< purchases (as created_by)
+                  ├──< karigar_raw_batches / customer_material_jobs (as user_id)
+                  ├──< exchange_transactions / refinery_batches (as created_by)
+                  └──< orders (as created_by)
 
 boxes ──< packets ──< items ──< movements (polymorphic trackable)
-                          │  └──< sale_items >── sales ──> customers
+                          │  ├──< sale_items >── sales ──> customers
+                          │  ├──< purchase_items >── purchases ──> vendors
+                          │  └── source_karigar_batch_id ──> karigar_raw_batches
                           └──< purchase_items >── purchases ──> vendors
+
+vendors ──< karigar_raw_batches, customer_material_jobs
 
 customers ──< loyalty_transactions
           ──< installment_schemes ──< installment_payments
           ──< referrals (self-referential via referred_by)
-          ──< sales
+          ──< sales, orders, exchange_transactions, customer_material_jobs
+          ──< pending_notifications
+
+orders ──> customers, items (in_stock_item_id, null), sales (converted_sale_id, null)
 
 discount_rules ──> items / packets / boxes / (category string) / (weight range)
 rate_logs ──> feeds PricingService, never joined directly by other tables
 accounts ──< transactions ── polymorphic reference to sales/purchases/installments
+pending_notifications ──> customers (null), polymorphic reference (related_type/id)
 ```

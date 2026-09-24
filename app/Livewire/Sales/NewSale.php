@@ -1,0 +1,169 @@
+<?php
+namespace App\Livewire\Sales;
+
+use App\Models\Customer\Customer;
+use App\Models\Customer\LoyaltySetting;
+use App\Models\Customer\LoyaltyTransaction;
+use App\Models\Pricing\GstRate;
+use App\Models\Sales\Sale;
+use App\Models\Stock\Item;
+use App\Services\PricingService;
+use Illuminate\Support\Facades\Auth;
+use Livewire\Component;
+
+/**
+ * New Sale / Billing.
+ *
+ * FLAG: sales.invoice_number is required + unique at row creation, but the
+ * spec wants the invoice number assigned only when admin approves in the
+ * Sale Verification Queue — and CLAUDE.md rule 1 forbids updating a sales
+ * row afterward to set it. Those two constraints conflict as the schema
+ * stands. Working placeholder used here: a "RESV-" number at creation,
+ * clearly not a real invoice. See the same note in SaleVerificationQueue.
+ *
+ * items.status now has a 'reserved' value (added alongside 'pending_review'
+ * for the same "pending admin verification" purpose used elsewhere). Items
+ * added to a sale are flipped to 'reserved' on submit, which is what keeps
+ * them out of the `itemResults` search below (scoped to 'in_stock') and
+ * therefore unavailable to other staff until SaleVerificationQueue verifies
+ * the sale and flips them to 'sold' (or, in future, releases them back to
+ * 'in_stock' on a rejected/cancelled sale).
+ */
+class NewSale extends Component
+{
+    public string $customerSearch = '';
+    public ?int $customerId = null;
+
+    public string $itemSearch = '';
+    public array $cart = []; // item_id => ['item' => Item, 'price' => float, 'gst' => float]
+
+    public float $loyaltyPointsUsed = 0;
+    public array $paymentModes = [['mode' => 'cash', 'amount' => 0]];
+
+    public ?string $result = null;
+
+    public function addItem(int $itemId)
+    {
+        if (isset($this->cart[$itemId])) return;
+
+        $item = Item::findOrFail($itemId);
+        $price = app(PricingService::class)->priceFor($item);
+        $gstRate = GstRate::forCategory($item->category);
+
+        $this->cart[$itemId] = [
+            'label' => $item->huid_code ?: $item->internal_code,
+            'category' => $item->category,
+            'price' => $price,
+            'gst_rate' => $gstRate,
+        ];
+        $this->itemSearch = '';
+    }
+
+    public function removeItem(int $itemId)
+    {
+        unset($this->cart[$itemId]);
+    }
+
+    public function addPaymentMode()
+    {
+        $this->paymentModes[] = ['mode' => 'cash', 'amount' => 0];
+    }
+
+    public function getSubtotalProperty(): float
+    {
+        return round(collect($this->cart)->sum('price'), 2);
+    }
+
+    public function getGstTotalProperty(): float
+    {
+        return round(collect($this->cart)->sum(fn ($c) => $c['price'] * $c['gst_rate'] / 100), 2);
+    }
+
+    public function getLoyaltyDiscountProperty(): float
+    {
+        $settings = LoyaltySetting::current();
+        $points = min($this->loyaltyPointsUsed, $this->customerObject?->loyalty_points ?? 0);
+        if ($points < $settings->min_redeemable_points) return 0;
+        return round($points * $settings->point_value_in_rupees, 2);
+    }
+
+    public function getGrandTotalProperty(): float
+    {
+        return max(0, round($this->subtotal + $this->gstTotal - $this->loyaltyDiscount, 2));
+    }
+
+    public function getCustomerObjectProperty()
+    {
+        return $this->customerId ? Customer::find($this->customerId) : null;
+    }
+
+    public function submit()
+    {
+        $this->validate([
+            'customerId' => 'required|exists:customers,id',
+        ]);
+        if (empty($this->cart)) {
+            $this->addError('cart', 'Add at least one item.');
+            return;
+        }
+
+        $sale = Sale::create([
+            'customer_id' => $this->customerId,
+            'invoice_number' => 'RESV-' . now()->format('YmdHis') . '-' . $this->customerId,
+            'type' => 'sale',
+            'cgst' => round($this->gstTotal / 2, 2),
+            'sgst' => round($this->gstTotal / 2, 2),
+            'igst' => 0,
+            'discount' => $this->loyaltyDiscount,
+            'payment_modes' => $this->paymentModes,
+            'total' => $this->grandTotal,
+            'confirmed_by_accountant' => false,
+            'created_by' => Auth::id(),
+        ]);
+
+        foreach ($this->cart as $itemId => $line) {
+            $sale->items()->attach($itemId, ['price_at_sale' => $line['price']]);
+        }
+
+        // Reserve the items now — they stay out of live availability from
+        // this point, but only become 'sold' once an admin verifies the
+        // sale in SaleVerificationQueue.
+        Item::whereIn('id', array_keys($this->cart))->update(['status' => 'reserved']);
+
+        // Points actually redeemed on this sale (loyaltyDiscount already
+        // floors this against min_redeemable_points) — log the debit and
+        // apply it to the customer's balance. This was previously computed
+        // for the discount but never actually deducted anywhere, which
+        // would have let points be re-used on the next sale — fixed here
+        // while building the Loyalty Points Ledger, since both read the
+        // same loyalty_transactions table.
+        $redeemedPoints = min($this->loyaltyPointsUsed, $this->customerObject?->loyalty_points ?? 0);
+        if ($this->loyaltyDiscount > 0 && $redeemedPoints > 0) {
+            LoyaltyTransaction::create([
+                'customer_id' => $this->customerId,
+                'points' => -$redeemedPoints,
+                'reason' => 'redeemed on sale',
+                'related_sale_id' => $sale->id,
+            ]);
+            Customer::whereKey($this->customerId)->decrement('loyalty_points', $redeemedPoints);
+        }
+
+        $this->result = "Sale #{$sale->id} reserved — awaiting admin verification before it becomes final.";
+        $this->reset(['customerId', 'customerSearch', 'cart', 'loyaltyPointsUsed', 'paymentModes']);
+        $this->paymentModes = [['mode' => 'cash', 'amount' => 0]];
+    }
+
+    public function render()
+    {
+        return view('livewire.sales.new-sale', [
+            'customerResults' => $this->customerSearch
+                ? Customer::where('name', 'like', "%{$this->customerSearch}%")->orWhere('phone', 'like', "%{$this->customerSearch}%")->limit(8)->get()
+                : collect(),
+            'itemResults' => $this->itemSearch
+                ? Item::where('status', 'in_stock')
+                    ->where(fn ($q) => $q->where('huid_code', 'like', "%{$this->itemSearch}%")->orWhere('internal_code', 'like', "%{$this->itemSearch}%")->orWhere('category', 'like', "%{$this->itemSearch}%"))
+                    ->limit(8)->get()
+                : collect(),
+        ])->layout('components.layouts.app', ['title' => 'New Sale — Radharani Jewellery']);
+    }
+}

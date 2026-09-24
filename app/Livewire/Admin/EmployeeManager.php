@@ -84,6 +84,6 @@ class EmployeeManager extends Component
                 ->withCount('user')
                 ->orderByDesc('id')
                 ->paginate(15),
-        ]);
+        ])->layout('components.layouts.app', ['title' => 'Employees — Radharani Jewellery']);
     }
 }

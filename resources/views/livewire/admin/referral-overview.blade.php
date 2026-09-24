@@ -1,46 +1,40 @@
-<x-layouts.app title="Referrals — Radharani Jewellery">
 <div>
-    <div class="rj-serif" style="font-size:24px;margin-bottom:4px;">Referral Overview</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:24px;">Who's referring customers, and whether the bonus has actually been earned.</div>
+    <x-ui.page-header title="Referral Overview" subtitle="Who's referring customers, and whether the bonus has actually been earned." />
 
     <input type="text" wire:model.live.debounce.300ms="search" placeholder="Search referrer name..."
-        class="rj-input" style="margin-bottom:16px;width:280px;">
+        class="rj-input mb-4 w-[280px]">
 
-    <div style="display:flex;flex-direction:column;gap:14px;">
+    <div class="flex flex-col gap-3.5">
         @forelse ($referrers as $referrer)
-            <div class="rj-card">
-                <div style="display:flex;justify-content:space-between;align-items:center;">
+            <x-ui.card>
+                <div class="flex justify-between items-center">
                     <div>
-                        <span style="font-weight:700;font-size:14px;">{{ $referrer->name }}</span>
-                        <span style="font-size:11.5px;color:var(--muted);margin-left:8px;">code: {{ $referrer->referral_code }}</span>
+                        <span class="font-bold text-sm text-ink_text-primary">{{ $referrer->name }}</span>
+                        <span class="text-[11.5px] text-ink_text-secondary ml-2">code: {{ $referrer->referral_code }}</span>
                     </div>
-                    <span class="rj-tag rj-tag-stock">{{ $referrer->referrals_count }} REFERRED</span>
+                    <x-ui.badge tone="success">{{ $referrer->referrals_count }} REFERRED</x-ui.badge>
                 </div>
 
-                <table class="rj-table" style="margin-top:12px;">
-                    <thead>
-                        <tr><th>Referred Customer</th><th>Purchases</th><th>Bonus Earned</th></tr>
-                    </thead>
-                    <tbody>
+                <div class="mt-3">
+                    <x-ui.table :headers="['Referred Customer', 'Purchases', 'Bonus Earned']">
                         @foreach ($referrer->referrals as $referred)
-                            <tr>
-                                <td>{{ $referred->name }}</td>
-                                <td>{{ $referred->sales_count }}</td>
-                                <td>
-                                    <span class="rj-tag {{ $referred->sales_count > 0 ? 'rj-tag-stock' : 'rj-tag-dispatched' }}">
+                            <tr class="h-[60px] border-b border-line-light">
+                                <td class="px-4 text-ink_text-primary">{{ $referred->name }}</td>
+                                <td class="px-4 text-ink_text-primary">{{ $referred->sales_count }}</td>
+                                <td class="px-4">
+                                    <x-ui.badge :tone="$referred->sales_count > 0 ? 'success' : 'warning'">
                                         {{ $referred->sales_count > 0 ? 'YES' : 'PENDING FIRST SALE' }}
-                                    </span>
+                                    </x-ui.badge>
                                 </td>
                             </tr>
                         @endforeach
-                    </tbody>
-                </table>
-            </div>
+                    </x-ui.table>
+                </div>
+            </x-ui.card>
         @empty
-            <div style="color:var(--muted);font-size:13px;">No referrals recorded yet.</div>
+            <div class="text-ink_text-secondary text-sm">No referrals recorded yet.</div>
         @endforelse
     </div>
 
-    <div style="margin-top:16px;">{{ $referrers->links() }}</div>
+    <div class="mt-4">{{ $referrers->links() }}</div>
 </div>
-</x-layouts.app>
