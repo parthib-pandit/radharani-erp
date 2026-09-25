@@ -1,187 +1,132 @@
 <?php
 namespace App\Livewire\Stock;
 
+use App\Livewire\Concerns\WithDataTable;
 use App\Models\Purchase\PurchaseItem;
+use App\Models\Stock\Box;
 use App\Models\Stock\Item;
 use App\Models\Stock\Packet;
+use App\Models\Stock\QrCode;
+use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
-use Livewire\WithPagination;
 
+// Inventory list. The add/edit form lives in ItemForm (embedded in this page's view).
 class ItemManager extends Component
 {
-    use WithPagination;
+    use WithDataTable;
 
-    public string $search = '';
-    public string $statusFilter = '';
+    // Filters (kept in the URL so a filtered list can be bookmarked / shared)
+    #[Url(as: 'category', except: '')]
+    public string $categoryFilter = '';
+    #[Url(as: 'box', except: '')]
+    public string $boxFilter = ''; // '' | box id | 'none' (no packet)
+    #[Url(as: 'metal', except: '')]
     public string $metalFilter = '';
-    public ?int $editingId = null;
+    #[Url(as: 'status', except: '')]
+    public string $statusFilter = '';
 
-    public ?int $packet_id = null;
-    public string $huid_code = '';
-    public string $metal = 'gold';
-    public string $category = '';
-    public string $purity = '';
-    public float $weight = 0;
-    public string $description = '';
-    public string $hsn_code = '';
-    public string $making_type = 'flat_per_piece';
-    public float $making_value = 0;
-    public bool $has_pair = false;
+    public bool $showPendingTags = false;
+    public bool $showAssign = false;
+    public ?int $assignPacketId = null;
 
-    // Set when tagging a pending raw-material purchase line into a new
-    // item — links the created item back to purchase_items.id and flips
-    // that line's tag_pending off once saved.
-    public ?int $taggingPurchaseItemId = null;
-
-    public function updatingSearch() { $this->resetPage(); }
-    public function updatingStatusFilter() { $this->resetPage(); }
-    public function updatingMetalFilter() { $this->resetPage(); }
-
-    protected function rules(): array
+    protected function sortableColumns(): array
     {
         return [
-            'packet_id' => 'nullable|exists:packets,id',
-            'huid_code' => 'nullable|string|max:20',
-            'metal' => 'required|in:gold,silver,titanium,platinum',
-            'category' => 'required|string|max:50',
-            'purity' => 'required|string|max:10',
-            'weight' => 'required|numeric|min:0.001',
-            'description' => 'nullable|string|max:100',
-            'hsn_code' => 'nullable|string|max:10',
-            'making_type' => 'required|in:percentage,flat_per_piece,flat_per_gram',
-            'making_value' => 'required|numeric|min:0',
+            'code' => 'items.id',
+            'category' => 'items.category',
+            'metal' => 'items.metal',
+            'weight' => 'items.weight',
+            'status' => 'items.status',
+            'location' => 'packet_code',
+            'created' => 'items.created_at',
         ];
     }
 
-    public function edit(int $id)
+    protected function defaultSort(): array
     {
-        $item = Item::findOrFail($id);
-        $this->editingId = $item->id;
-        $this->packet_id = $item->packet_id;
-        $this->huid_code = (string) $item->huid_code;
-        $this->metal = $item->metal ?? 'gold';
-        $this->category = $item->category;
-        $this->purity = $item->purity;
-        $this->weight = $item->weight;
-        $this->description = (string) $item->description;
-        $this->hsn_code = (string) $item->hsn_code;
-        $this->making_type = $item->making_type;
-        $this->making_value = $item->making_value;
+        return ['created', 'desc'];
     }
 
-    // Pre-fills the New Item form from a pending raw-material purchase line
-    // so staff don't retype the description/category/metal/purity. The
-    // form otherwise behaves exactly like a normal New Item save.
-    public function tagFromPurchaseLine(int $purchaseItemId)
+    protected function filterProperties(): array
     {
-        $line = PurchaseItem::findOrFail($purchaseItemId);
-
-        $this->cancel();
-        $this->taggingPurchaseItemId = $line->id;
-        $this->metal = $line->metal ?? 'gold';
-        $this->category = (string) $line->category;
-        $this->purity = (string) $line->purity;
-        $this->weight = (float) $line->weight;
-        $this->description = (string) $line->description;
+        return ['categoryFilter', 'boxFilter', 'metalFilter', 'statusFilter'];
     }
 
-    public function cancelTagging()
+    #[On('item-saved')]
+    public function itemSaved(): void
     {
-        $this->cancel();
+        // Re-render picks up the new/edited piece.
     }
 
-    public function save()
+    public function openAssign(): void
     {
-        $this->validate();
-
-        $data = [
-            'packet_id' => $this->packet_id,
-            'huid_code' => $this->huid_code ?: null,
-            'metal' => $this->metal,
-            'category' => $this->category,
-            'purity' => $this->purity,
-            'weight' => $this->weight,
-            'description' => $this->description,
-            'hsn_code' => $this->hsn_code,
-            'making_type' => $this->making_type,
-            'making_value' => $this->making_value,
-        ];
-
-        if ($this->taggingPurchaseItemId) {
-            $data['source_purchase_item_id'] = $this->taggingPurchaseItemId;
-        }
-
-        // No HUID → auto-generate a unique internal code from Item's
-        // curated non-ambiguous charset.
-        if (empty($data['huid_code']) && ! $this->editingId) {
-            $data['internal_code'] = Item::generateInternalCode();
-        }
-
-        $item = Item::updateOrCreate(['id' => $this->editingId], $data);
-
-        if ($this->taggingPurchaseItemId) {
-            PurchaseItem::where('id', $this->taggingPurchaseItemId)->update([
-                'tag_pending' => false,
-                'item_id' => $item->id,
-            ]);
-        }
-
-        // Pair (e.g. earrings): create a second linked row sharing pair_group_id.
-        if ($this->has_pair && ! $this->editingId) {
-            $item->pair_group_id = $item->pair_group_id ?? $item->id;
-            $item->save();
-
-            $partnerData = $data;
-            $partnerData['pair_group_id'] = $item->pair_group_id;
-            unset($partnerData['internal_code']);
-            if (empty($data['huid_code'])) {
-                $partnerData['internal_code'] = Item::generateInternalCode();
-            }
-            Item::create($partnerData);
-        }
-
-        $this->reset([
-            'editingId', 'packet_id', 'huid_code', 'metal', 'category', 'purity',
-            'weight', 'description', 'hsn_code', 'making_type', 'making_value',
-            'has_pair', 'taggingPurchaseItemId',
-        ]);
-        $this->making_type = 'flat_per_piece';
-        $this->metal = 'gold';
-
-        session()->flash('message', 'Item saved.');
+        $this->resetValidation();
+        $this->assignPacketId = null;
+        $this->showAssign = true;
     }
 
-    public function cancel()
+    // One save per piece so every regrouping is written to the history log.
+    public function assignSelected(): void
     {
-        $this->reset([
-            'editingId', 'packet_id', 'huid_code', 'metal', 'category', 'purity',
-            'weight', 'description', 'hsn_code', 'making_type', 'making_value',
-            'has_pair', 'taggingPurchaseItemId',
-        ]);
-        $this->making_type = 'flat_per_piece';
-        $this->metal = 'gold';
+        $this->validate(['assignPacketId' => 'nullable|exists:packets,id'], [], ['assignPacketId' => 'packet']);
+
+        $items = Item::whereIn('id', $this->selected)->get();
+        foreach ($items as $item) {
+            $item->update(['packet_id' => $this->assignPacketId ?: null]);
+        }
+
+        $target = $this->assignPacketId ? 'packet ' . Packet::find($this->assignPacketId)->code : 'no packet';
+        $this->showAssign = false;
+        $this->selected = [];
+        $this->dispatch('toast', message: "{$items->count()} piece(s) moved to {$target}.", type: 'success');
+    }
+
+    public function printSelectedQr()
+    {
+        $ids = Item::whereIn('id', $this->selected)->pluck('id')->map(fn ($id) => QrCode::forTarget('item', $id)->id);
+
+        return $ids->isEmpty() ? null : $this->redirectRoute('stock.qr.print', ['ids' => $ids->implode(',')]);
     }
 
     public function render()
     {
-        $items = Item::with('packet.box')
-            ->when($this->search, fn ($q) => $q
-                ->where('huid_code', 'like', "%{$this->search}%")
-                ->orWhere('internal_code', 'like', "%{$this->search}%")
-                ->orWhere('category', 'like', "%{$this->search}%"))
-            ->when($this->statusFilter, fn ($q) => $q->where('status', $this->statusFilter))
-            ->when($this->metalFilter, fn ($q) => $q->where('metal', $this->metalFilter))
-            ->orderByDesc('id')
-            ->paginate(15);
+        $query = Item::query()
+            ->select('items.*')
+            ->leftJoin('packets', 'packets.id', '=', 'items.packet_id')
+            ->leftJoin('boxes', 'boxes.id', '=', 'packets.box_id')
+            ->addSelect('packets.code as packet_code', 'boxes.code as box_code', 'packets.box_id as box_id')
+            ->when($this->search, fn ($q) => $q->where(fn ($q) => $q
+                ->where('items.huid_code', 'like', "%{$this->search}%")
+                ->orWhere('items.internal_code', 'like', "%{$this->search}%")
+                ->orWhere('items.category', 'like', "%{$this->search}%")
+                ->orWhere('items.description', 'like', "%{$this->search}%")))
+            ->when($this->categoryFilter, fn ($q) => $q->where('items.category', $this->categoryFilter))
+            ->when($this->metalFilter, fn ($q) => $q->where('items.metal', $this->metalFilter))
+            ->when($this->statusFilter, fn ($q) => $q->where('items.status', $this->statusFilter))
+            ->when($this->boxFilter === 'none', fn ($q) => $q->whereNull('items.packet_id'))
+            ->when(ctype_digit($this->boxFilter), fn ($q) => $q->where('packets.box_id', (int) $this->boxFilter));
+
+        $query = $this->applySorting($query)->orderByDesc('items.id');
+
+        $inStock = Item::where('status', 'in_stock');
 
         return view('livewire.stock.item-manager', [
-            'items' => $items,
-            'packets' => Packet::orderBy('code')->get(),
-            'pendingTags' => PurchaseItem::where('tag_pending', true)
-                ->whereNull('item_id')
-                ->with('purchase.vendor')
-                ->orderByDesc('id')
-                ->get(),
-        ])->layout('components.layouts.app', ['title' => 'Inventory — Radharani Jewellery ERP']);
+            'items' => $query->paginate($this->perPageValue()),
+            'categories' => Item::query()->distinct()->orderBy('category')->pluck('category'),
+            'boxes' => Box::orderBy('code')->get(['id', 'code', 'label']),
+            'packetsByBox' => $this->showAssign
+                ? Packet::with('box:id,code')->orderBy('code')->get(['id', 'code', 'label', 'box_id'])->groupBy(fn ($p) => $p->box?->code ?? 'Not in a box')
+                : collect(),
+            'pendingTags' => PurchaseItem::where('tag_pending', true)->whereNull('item_id')
+                ->with('purchase.vendor')->orderByDesc('id')->get(),
+            'stats' => [
+                'inStock' => (clone $inStock)->count(),
+                'inStockWeight' => (float) (clone $inStock)->sum('weight'),
+                'dispatched' => Item::where('status', 'dispatched')->count(),
+                'pending' => Item::where('status', 'pending_review')->count(),
+                'reserved' => Item::where('status', 'reserved')->count(),
+            ],
+        ])->layout('components.layouts.app', ['title' => 'Inventory · Radharani Jewellery ERP']);
     }
 }

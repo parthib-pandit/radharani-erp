@@ -1,14 +1,18 @@
 @props(['headers' => []])
-<div class="overflow-x-auto">
-    <table class="w-full border-collapse text-[13.5px]">
-        @if(count($headers))
+{{-- headers: strings, or ['label' => ..., 'class' => ...] for alignment/width. Rows go in the slot. --}}
+<div class="relative overflow-x-auto">
+    <table {{ $attributes->merge(['class' => 'rj-table']) }}>
+        @if (count($headers))
             <thead>
-                <tr class="h-11 bg-surface-muted">
-                    @foreach($headers as $header)
-                        <th class="text-left px-4 text-xs font-semibold text-ink_text-secondary uppercase tracking-wide">{{ $header }}</th>
+                <tr>
+                    @foreach ($headers as $header)
+                        @php $h = is_array($header) ? $header : ['label' => $header]; @endphp
+                        <th class="{{ $h['class'] ?? '' }}">{{ $h['label'] }}</th>
                     @endforeach
                 </tr>
             </thead>
+        @elseif (isset($head))
+            <thead><tr>{{ $head }}</tr></thead>
         @endif
         <tbody>
             {{ $slot }}

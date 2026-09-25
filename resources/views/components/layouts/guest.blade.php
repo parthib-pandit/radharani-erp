@@ -3,7 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ $title ?? 'Radharani Jewellery — Customer Portal' }}</title>
+<meta name="csrf-token" content="{{ csrf_token() }}">
+<meta name="theme-color" content="#151515">
+<title>{{ $title ?? 'Radharani Jewellery Works' }}</title>
+<link rel="preload" as="image" href="{{ asset('images/auth/kundan-choker.webp') }}" media="(min-width: 1024px)">
 @vite(['resources/css/app.css', 'resources/js/app.js'])
 @livewireStyles
 </head>

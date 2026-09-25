@@ -1,40 +1,29 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Radharani Jewellery ERP</title>
-@vite(['resources/css/app.css', 'resources/js/app.js'])
-</head>
-<body class="font-sans antialiased bg-surface-bg text-ink_text-primary">
-<div class="max-w-[720px] mx-auto px-6 pt-24 pb-20 text-center">
-  <div class="w-16 h-16 rounded-full bg-ink flex items-center justify-center mx-auto mb-5">
-    <x-ui.icon name="gem" :size="28" class="text-gold" />
-  </div>
+<x-layouts.guest title="Radharani Jewellery Works">
+<x-auth.shell audience="welcome" heading="Every piece, accounted for."
+    lede="The stock room, the counter and our customers, kept in step. Choose how you'd like to sign in.">
 
-  <div class="text-[34px] font-bold">Radharani Jewellery ERP</div>
-  <div class="text-[13px] tracking-[.14em] text-ink_text-muted uppercase mt-2">Stock Management &amp; Customer Portal</div>
+    <p class="text-[12px] font-bold uppercase tracking-[0.18em] text-gold-dark">Radharani Jewellery Works</p>
+    <h1 class="font-display text-[40px] leading-[1.08] font-semibold mt-2">How are you signing in?</h1>
+    <p class="text-[14px] text-ink_text-secondary mt-2">Staff and customers have separate, secure sign-ins.</p>
 
-  <div class="text-sm text-ink_text-secondary max-w-[460px] mx-auto mt-6 mb-10 leading-relaxed">
-    Every piece tracked from vault to counter. Current gold and silver rates,
-    reflected instantly across the collection.
-  </div>
-
-  <div class="grid grid-cols-2 gap-4 max-w-[480px] mx-auto">
-    <a href="{{ route('login') }}" class="bg-white border border-line rounded-card p-6 hover:border-gold hover:shadow-card hover:-translate-y-0.5 transition-all">
-      <div class="text-[15px] font-bold">Staff Login</div>
-      <div class="text-[11.5px] text-ink_text-secondary mt-1.5">Inventory, movements &amp; sales</div>
-    </a>
-    <a href="{{ route('portal.login') }}" class="bg-white border border-line rounded-card p-6 hover:border-gold hover:shadow-card hover:-translate-y-0.5 transition-all">
-      <div class="text-[15px] font-bold">Customer Portal</div>
-      <div class="text-[11.5px] text-ink_text-secondary mt-1.5">Purchases, loyalty &amp; installments</div>
-    </a>
-  </div>
-
-  <div class="mt-14 pt-5 border-t border-line text-[11.5px] text-ink_text-secondary">
-    &copy; {{ date('Y') }} Radharani Jewellery Works
-    <div class="mt-1 text-[10.5px] text-ink_text-muted">Powered by Echocrew</div>
-  </div>
-</div>
-</body>
-</html>
+    <div class="mt-8 space-y-3">
+        @foreach ([
+            [route('login'), 'shield-check', 'I work at the shop', 'Stock, movements, billing and reports', true],
+            [route('portal.login'), 'user', "I'm a customer", 'Your invoices, loyalty points and instalments', false],
+        ] as [$href, $icon, $title, $sub, $primary])
+            <a href="{{ $href }}"
+               class="group press flex items-center gap-4 p-5 rounded-2xl border transition-[border-color,box-shadow,background-color]
+                      {{ $primary ? 'bg-ink border-ink text-white hover:shadow-modal' : 'bg-white border-line-light hover:border-gold-soft hover:shadow-raised' }}">
+                <span class="w-12 h-12 shrink-0 rounded-xl flex items-center justify-center {{ $primary ? 'gold-sheen text-ink shadow-gold' : 'bg-gold-tint text-gold-dark ring-1 ring-inset ring-gold-soft' }}">
+                    <x-ui.icon :name="$icon" :size="20" />
+                </span>
+                <span class="flex-1 min-w-0">
+                    <span class="block text-[15.5px] font-bold {{ $primary ? 'text-white' : 'text-ink_text-primary' }}">{{ $title }}</span>
+                    <span class="block text-[13px] mt-0.5 {{ $primary ? 'text-ink-fg' : 'text-ink_text-secondary' }}">{{ $sub }}</span>
+                </span>
+                <x-ui.icon name="arrow-right" :size="18" class="shrink-0 transition-transform group-hover:translate-x-1 {{ $primary ? 'text-gold-light' : 'text-ink_text-muted' }}" />
+            </a>
+        @endforeach
+    </div>
+</x-auth.shell>
+</x-layouts.guest>
