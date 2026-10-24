@@ -59,7 +59,14 @@ return new class extends Migration
     {
         $col = DB::selectOne("SELECT IS_NULLABLE n, COLUMN_DEFAULT d FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = 'metal'", [$table]);
         $null = $col->n === 'YES' ? 'NULL' : 'NOT NULL';
-        $default = $col->d !== null ? ' DEFAULT ' . DB::getPdo()->quote($col->d) : '';
+        // MariaDB reports "no default" as the string 'NULL' and wraps real defaults in quotes; MySQL gives null / the bare value.
+        $d = $col->d;
+        if ($d !== null && strcasecmp($d, 'NULL') !== 0) {
+            $d = trim($d, "'");
+        } else {
+            $d = null;
+        }
+        $default = $d !== null ? ' DEFAULT ' . DB::getPdo()->quote($d) : '';
         DB::statement("ALTER TABLE `{$table}` MODIFY `metal` ENUM({$values}) {$null}{$default}");
     }
 };
