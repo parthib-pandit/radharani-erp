@@ -118,7 +118,7 @@
                             </figure>
                             <div class="pt-line__txt">
                                 <b>{{ $name }}</b>
-                                <span>{{ ucfirst((string) $piece->metal) }}{{ $piece->purity ? ' '.$piece->purity : '' }} &middot; {{ number_format((float) ($piece->net_weight ?: $piece->weight), 3) }} g &middot; {{ $piece->huid_code ? 'HUID '.$piece->huid_code : 'Code '.$piece->internal_code }}</span>
+                                <span>{{ ucfirst((string) $piece->metal) }}{{ $piece->purity ? ' '.$piece->purity : '' }} &middot; {{ number_format((float) ($piece->pivot->weight_at_sale ?? ($piece->net_weight ?: $piece->weight)), 3) }} g &middot; {{ $piece->huid_code ? 'HUID '.$piece->huid_code : 'Code '.$piece->internal_code }}</span>
                             </div>
                             <span class="pt-line__price">{{ $inr($piece->pivot->price_at_sale) }}</span>
                         </li>
@@ -126,7 +126,7 @@
                 </ul>
 
                 <dl class="pt-sum">
-                    @if ((float) $sale->discount > 0)<div><dt>Discount</dt><dd>&minus;{{ $inr($sale->discount) }}</dd></div>@endif
+                    @if ((float) $sale->discount + (float) $sale->final_discount > 0)<div><dt>Discount</dt><dd>&minus;{{ $inr((float) $sale->discount + (float) $sale->final_discount) }}</dd></div>@endif
                     <div class="pt-sum__total"><dt>Total</dt><dd>{{ $inr($sale->total) }}</dd></div>
                     @if ($balance > 0.005)<div><dt>Still to pay</dt><dd>{{ $inr($balance) }}</dd></div>@endif
                 </dl>

@@ -21,7 +21,14 @@
             <x-ui.table :headers="['Piece', 'Category', 'Weight', 'Price']">
                 @foreach ($sale->items as $item)
                     <tr><td><a href="{{ route('stock.items.show', $item) }}" class="rj-code hover:text-gold-dark">{{ $item->label }}</a></td><td>{{ $item->category }}</td>
-                        <td class="tabular">{{ number_format($item->weight, 3) }} g</td><td class="tabular">₹{{ number_format($item->pivot->price_at_sale) }}</td></tr>
+                        <td class="tabular">{{ number_format($item->pivot->weight_at_sale ?? $item->weight, 3) }} g
+                            @if ($item->pivot->weight_at_sale !== null && $item->pivot->weight_listed !== null && abs($item->pivot->weight_at_sale - $item->pivot->weight_listed) > 0.0004)
+                                <span class="block text-[11.5px] text-warning font-semibold" title="{{ $item->pivot->weight_note }}">record {{ number_format($item->pivot->weight_listed, 3) }} g{{ $item->pivot->weight_note ? ' · ' . $item->pivot->weight_note : '' }}</span>
+                            @endif
+                            @if ($item->pivot->making_rate !== null && abs($item->pivot->making_rate - $item->pivot->making_default_rate) > 0.004)
+                                <span class="block text-[11.5px] text-danger font-semibold">making {{ \App\Services\PricingService::rateText($item->pivot->making_kind, (float) $item->pivot->making_rate) }}, priced at {{ \App\Services\PricingService::rateText($item->pivot->making_kind, (float) $item->pivot->making_default_rate) }}</span>
+                            @endif
+                        </td><td class="tabular">₹{{ number_format($item->pivot->price_at_sale) }}</td></tr>
                 @endforeach
                 @if ($sale->discount > 0)
                     <tr class="text-success"><td colspan="3">Adjustment{{ $sale->adjustment_type === 'percent' ? ' (' . rtrim(rtrim(number_format($sale->adjustment_value, 2), '0'), '.') . '%)' : '' }}</td><td class="tabular">- ₹{{ number_format($sale->discount, 2) }}</td></tr>
@@ -36,6 +43,9 @@
                 @endforeach
                 @if ((float) $sale->round_off != 0)
                     <tr><td colspan="3" class="text-ink_text-secondary">Round off</td><td class="tabular">{{ $sale->round_off > 0 ? '+' : '-' }} ₹{{ number_format(abs($sale->round_off), 2) }}</td></tr>
+                @endif
+                @if ((float) $sale->final_discount > 0)
+                    <tr class="text-success"><td colspan="3">Discount</td><td class="tabular">- ₹{{ number_format($sale->final_discount, 2) }}</td></tr>
                 @endif
                 <tr class="font-semibold bg-surface-sunken"><td colspan="3">Total</td><td class="tabular">₹{{ number_format($sale->total, 2) }}</td></tr>
             </x-ui.table>

@@ -174,20 +174,19 @@ class ExcelPricingTest extends TestCase
         $customer = Customer::create(['name' => 'Sheet Customer', 'phone' => (string) random_int(6000000000, 9999999999)]);
 
         $c = Livewire::test(NewSale::class)->set('customerId', $customer->id)->call('next')->call('addItem', $piece->id)
-            ->call('next')->set('extras', [['name' => 'Packing', 'amount' => '50']])->call('next');
-        // 12,038.15 + 50 = 12,088.15 -> 12,088; a final price of 12,000 takes 88 / 1.03 off the making charge
-        $c->set('adjustType', 'final')->set('adjustValue', '12000');
+            ->call('next')->set('extras', [['name' => 'Packing', 'amount' => '50']]);
+        // 12,038.15 + 50 = 12,088.15 -> 12,088 with the round-off of -0.15; a final price of 12,000 is a discount of 88 after it
+        $c->set('finalType', 'final')->set('finalValue', '12000')->call('next');
         $this->assertEquals(12000, $c->get('total'));
-        $this->assertEquals(85.44, $c->get('adjustment'));
-        $this->assertEqualsWithDelta(12000, collect($c->get('payments'))->sum(fn ($p) => (float) $p['amount']), 0.005, 'the payment line follows the adjustment');
+        $this->assertEqualsWithDelta(12000, collect($c->get('payments'))->sum(fn ($p) => (float) $p['amount']), 0.005, 'the payment line follows the discount');
 
         $c->call('next')->call('submit')->assertHasNoErrors();
         $sale = Sale::where('customer_id', $customer->id)->firstOrFail();
         $this->assertEquals(12000, $sale->total);
         $this->assertEquals(-0.15, (float) $sale->round_off);
-        $this->assertEquals(85.44, (float) $sale->discount);
-        $this->assertSame('flat', $sale->adjustment_type, 'a final price is kept as the discount it comes to');
-        $this->assertEquals(362.63, (float) $sale->gst_amount);   // the GST fell with the making charge
+        $this->assertEquals(88, (float) $sale->final_discount, 'the discount comes after the round-off');
+        $this->assertEquals(0, (float) $sale->discount, 'no bill-level adjustment of the making charge any more');
+        $this->assertEquals(365.19, (float) $sale->gst_amount);   // the GST is on the full price: only the end of the bill moved
         $this->assertEquals(0, $sale->balance);
         $this->assertEquals(10333 + 1239.96 + 100, (float) $sale->items()->first()->pivot->price_at_sale);
 

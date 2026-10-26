@@ -183,7 +183,7 @@ class Item extends Model
 
     public function sales()
     {
-        return $this->belongsToMany(\App\Models\Sales\Sale::class, 'sale_items')->withPivot('price_at_sale');
+        return $this->belongsToMany(\App\Models\Sales\Sale::class, 'sale_items')->withPivot('price_at_sale', 'weight_listed', 'weight_at_sale', 'weight_note', 'making_kind', 'making_default_rate', 'making_rate', 'making_amount');
     }
 
     public function movements()
