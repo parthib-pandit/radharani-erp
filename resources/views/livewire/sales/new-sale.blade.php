@@ -178,12 +178,14 @@
                     <h3 class="text-[13px] font-bold mb-2">Additional charges on this sale</h3>
                     @foreach ($extras as $i => $e)
                         <div class="flex gap-2 mb-2" wire:key="ex-{{ $i }}">
-                            <input type="text" wire:model.live.debounce.300ms="extras.{{ $i }}.name" placeholder="What for" class="rj-input flex-1" maxlength="60" aria-label="Charge name">
+                            <input type="text" wire:model.live.debounce.300ms="extras.{{ $i }}.name" list="rj-charge-names" placeholder="What for, e.g. Sakha" class="rj-input flex-1" maxlength="60" aria-label="Charge name" autocomplete="off">
                             <input type="number" step="0.01" min="0" wire:model.live.debounce.300ms="extras.{{ $i }}.amount" placeholder="₹" class="rj-input tabular w-[130px] @error('extras.' . $i . '.amount') is-invalid @enderror" aria-label="Charge amount">
                             <x-ui.button variant="ghost" size="icon-sm" icon="x" wire:click="removeExtra({{ $i }})" aria-label="Remove charge" />
                         </div>
+                        @if (! empty($e['item_id']) && isset($cart[$e['item_id']]))<p class="-mt-1 mb-2 text-[11.5px] text-ink_text-muted">Comes with {{ $cart[$e['item_id']]['label'] }}. You can change or remove it.</p>@endif
                         @error('extras.' . $i . '.amount')<p class="rj-error">{{ $message }}</p>@enderror
                     @endforeach
+                    <datalist id="rj-charge-names">@foreach ($chargeNames as $cn)<option value="{{ $cn }}">@endforeach</datalist>
                     <x-ui.button variant="secondary" size="sm" icon="plus" wire:click="addExtra">Add a charge</x-ui.button>
 
                     <x-ui.field label="Notes" for="sale-notes" optional class="mt-5"><input id="sale-notes" type="text" wire:model="notes" maxlength="255" class="rj-input"></x-ui.field>

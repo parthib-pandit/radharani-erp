@@ -129,6 +129,9 @@
             <x-ui.card title="Pricing setup" icon="coins">
                 <dl class="rj-dl">
                     <div class="col-span-2"><dt>Making charge</dt><dd>{{ $makingLabel }} · <span class="tabular">{{ $makingValue }}</span></dd></div>
+                    @if ($item->defaultCharges())
+                        <div class="col-span-2"><dt>Additional charges</dt><dd>@foreach ($item->defaultCharges() as $c){{ $c['name'] }} <span class="tabular">₹{{ number_format($c['amount'], 2) }}</span>{{ ! $loop->last ? ' · ' : '' }}@endforeach <span class="text-[12px] text-ink_text-muted">on every bill, not taxed</span></dd></div>
+                    @endif
                 </dl>
                 @if ($price)
                     <div class="mt-4 pt-4 border-t border-line-light space-y-2 text-[13px]">

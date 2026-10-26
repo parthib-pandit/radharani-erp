@@ -190,6 +190,9 @@
                         @if ($r['data']['making_type'])
                             {{ $r['data']['making_type'] === 'percentage' ? $r['data']['making_value'] . '%' : '₹' . $r['data']['making_value'] . ($r['data']['making_type'] === 'flat_per_gram' ? ' / g' : ' / pc') }}
                         @else ? @endif
+                        @foreach ($r['data']['charges'] ?? [] as $c)
+                            <span class="block text-ink_text-muted">+ {{ $c['name'] }} ₹{{ $c['amount'] }}</span>
+                        @endforeach
                     </td>
                     <td class="max-w-[260px]">
                         @if ($r['errors'])

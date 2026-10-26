@@ -28,6 +28,11 @@ class BulkImport extends Component
         'hsn_code' => ['HSN code', false, ['hsn']],
         'making_type' => ['Making type', false, ['making type', 'making_type', 'mc type']],
         'making_value' => ['Making value', false, ['making', 'making value', 'making charge', 'mc', 'labour', 'wastage']],
+        // Up to two additional charges a piece carries by default (25 Oct), each a name and an amount.
+        'charge1_name' => ['Additional charge 1', false, ['additional charge 1', 'additional 1', 'extra charge 1', 'charge 1', 'additional charge']],
+        'charge1_amount' => ['Additional amount 1', false, ['additional amount 1', 'additional price 1', 'charge amount 1', 'charge 1 amount', 'additional amount']],
+        'charge2_name' => ['Additional charge 2', false, ['additional charge 2', 'additional 2', 'extra charge 2', 'charge 2']],
+        'charge2_amount' => ['Additional amount 2', false, ['additional amount 2', 'additional price 2', 'charge amount 2', 'charge 2 amount']],
     ];
 
     public int $step = 1;
@@ -120,10 +125,10 @@ class BulkImport extends Component
     {
         return response()->streamDownload(function () {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['HUID', 'Category', 'Metal', 'Purity', 'Weight', 'Description', 'HSN', 'Making type', 'Making value']);
-            fputcsv($out, ['', 'Ring', 'gold', '22K', '4.250', 'Floral band', '7113', 'per piece', '650']);
-            fputcsv($out, ['A7K812', 'Necklace', 'gold', '22K', '28.600', 'Temple design', '7113', 'percentage', '14']);
-            fputcsv($out, ['', 'Anklet', 'silver', '92.5', '31.400', 'Pair, left', '7113', 'per gram', '9']);
+            fputcsv($out, ['HUID', 'Category', 'Metal', 'Purity', 'Weight', 'Description', 'HSN', 'Making type', 'Making value', 'Additional charge 1', 'Additional amount 1', 'Additional charge 2', 'Additional amount 2']);
+            fputcsv($out, ['', 'Ring', 'gold', '22K', '4.250', 'Floral band', '7113', 'per piece', '650', '', '', '', '']);
+            fputcsv($out, ['A7K812', 'Necklace', 'gold', '22K', '28.600', 'Temple design', '7113', 'percentage', '14', 'Sakha', '250', '', '']);
+            fputcsv($out, ['', 'Anklet', 'silver', '92.5', '31.400', 'Pair, left', '7113', 'per gram', '9', 'Polish', '100', 'Packing', '50']);
             fclose($out);
         }, 'stock-import-template.csv', ['Content-Type' => 'text/csv']);
     }
@@ -166,6 +171,7 @@ class BulkImport extends Component
         $this->reviewRows = [];
 
         foreach ($this->rows as $n => $row) {
+            $chargeProblems = [];
             $get = fn ($field) => isset($fieldIndex[$field]) ? trim((string) ($row[$fieldIndex[$field]] ?? '')) : '';
 
             $data = [
@@ -178,9 +184,24 @@ class BulkImport extends Component
                 'hsn_code' => $get('hsn_code') ?: null,
                 'making_type' => $this->parseMakingType($get('making_type')),
                 'making_value' => $get('making_value') !== '' ? str_replace([',', '₹', '%', ' '], '', $get('making_value')) : $this->defaultMakingValue,
+                'charges' => [],
             ];
 
-            $errors = [];
+            // Additional charges: a name and an amount together, or neither.
+            foreach ([1, 2] as $k) {
+                $cName = mb_substr($get("charge{$k}_name"), 0, 60);
+                $cAmount = str_replace([',', '₹', ' '], '', $get("charge{$k}_amount"));
+                if ($cName === '' && $cAmount === '') {
+                    continue;
+                }
+                if ($cName === '' || ! is_numeric($cAmount) || (float) $cAmount <= 0) {
+                    $chargeProblems[] = "Additional charge {$k} needs a name and an amount";
+                    continue;
+                }
+                $data['charges'][] = ['name' => $cName, 'amount' => round((float) $cAmount, 2)];
+            }
+
+            $errors = $chargeProblems;
             if (! is_numeric($data['weight']) || (float) $data['weight'] <= 0) $errors[] = 'Weight is not a number';
             if (! $data['metal']) $errors[] = 'Unknown metal "' . $get('metal') . '"';
             if (! $data['making_type']) $errors[] = 'Unknown making type "' . $get('making_type') . '"';
@@ -300,6 +321,7 @@ class BulkImport extends Component
                     'hsn_code' => $d['hsn_code'],
                     'making_type' => $d['making_type'],
                     'making_value' => (float) $d['making_value'],
+                    'default_additional_charges' => $d['charges'] ?: null,
                     // Every import lands unassigned (no packet, so on hold) until someone puts it in a packet.
                     'packet_id' => null,
                     'status' => 'on_hold',

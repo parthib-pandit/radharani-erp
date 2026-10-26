@@ -65,6 +65,9 @@ class ItemForm extends Component
     public $stone_value = '';
     public $mrp = '';   // a diamond piece is priced at this alone (17 Oct)
 
+    // Additional charges this piece carries by default (25 Oct): [['name' => 'Sakha', 'amount' => '250']]. A sale starts with them.
+    public array $charges = [];
+
     // Diamond jewellery only (the Diamond subcategory): the diamond weight, its cut and a summary number.
     public const DIAMOND_CUTS = ['Round brilliant', 'Princess', 'Oval', 'Pear', 'Marquise', 'Emerald', 'Cushion', 'Heart', 'Radiant', 'Asscher'];
     public $diamond_carat = '';
@@ -123,6 +126,9 @@ class ItemForm extends Component
             'stones' => ['nullable', 'string', 'max:120'],
             'stone_value' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
             'mrp' => [Rule::requiredIf($this->metal === 'diamond'), 'nullable', 'numeric', 'min:1', 'max:99999999'],
+            'charges' => ['array', 'max:10'],
+            'charges.*.name' => ['nullable', 'string', 'max:60'],
+            'charges.*.amount' => ['nullable', 'numeric', 'min:0', 'max:99999999'],
             'diamond_carat' => ['nullable', 'numeric', 'min:0.001', 'max:9999'],
             'diamond_cut' => ['nullable', 'string', 'max:40'],
             'diamond_summary_no' => ['nullable', 'string', 'max:60'],
@@ -176,6 +182,8 @@ class ItemForm extends Component
         'net_weight' => 'net weight',
         'stone_value' => 'stone value',
         'mrp' => 'MRP',
+        'charges.*.name' => 'charge name',
+        'charges.*.amount' => 'charge amount',
         'diamond_carat' => 'diamond weight',
         'diamond_summary_no' => 'summary number',
         'web_name' => 'website name',
@@ -212,7 +220,7 @@ class ItemForm extends Component
         $this->reset([
             'editingId', 'packet_id', 'huid_code', 'category', 'categoryId', 'purity', 'weight', 'description', 'hsn_code',
             'making_value', 'pairMode', 'partnerWeight', 'partnerHuid', 'pairSearch', 'pairWithId', 'currentPairId',
-            'taggingPurchaseItemId', 'net_weight', 'stones', 'stone_value', 'mrp', 'diamond_carat', 'diamond_cut', 'diamond_summary_no', 'tab',
+            'taggingPurchaseItemId', 'net_weight', 'stones', 'stone_value', 'charges', 'mrp', 'diamond_carat', 'diamond_cut', 'diamond_summary_no', 'tab',
             'show_on_website', 'web_name', 'web_description', 'storefront_collection_id', 'audiences', 'occasions',
             'dimensions', 'size_type', 'size_label', 'is_bestseller', 'slug', 'photos', 'removedPhotoIds', 'newPhotos',
         ]);
@@ -241,6 +249,7 @@ class ItemForm extends Component
         $this->stones = (string) $item->stones;
         $this->stone_value = (float) $item->stone_value ? (string) (float) $item->stone_value : '';
         $this->mrp = (float) $item->mrp ? (string) (float) $item->mrp : '';
+        $this->charges = collect($item->defaultCharges())->map(fn ($c) => ['name' => $c['name'], 'amount' => (string) $c['amount']])->all();
         $this->diamond_carat = $item->diamond_carat !== null ? (string) (float) $item->diamond_carat : '';
         $this->diamond_cut = (string) $item->diamond_cut;
         $this->diamond_summary_no = (string) $item->diamond_summary_no;
@@ -316,6 +325,38 @@ class ItemForm extends Component
         }
     }
 
+    public function addCharge(): void
+    {
+        if (count($this->charges) < 10) {
+            $this->charges[] = ['name' => '', 'amount' => ''];
+        }
+    }
+
+    public function removeCharge(int $i): void
+    {
+        unset($this->charges[$i]);
+        $this->charges = array_values($this->charges);
+    }
+
+    /** The charges worked into what is saved: a row needs a name and an amount, both or neither. */
+    private function chargesData(): ?array
+    {
+        $rows = [];
+        foreach ($this->charges as $i => $c) {
+            $name = trim((string) ($c['name'] ?? ''));
+            $amount = $c['amount'] ?? '';
+            if ($name === '' && ($amount === '' || $amount === null)) {
+                continue;
+            }
+            if ($name === '' || ! is_numeric($amount) || (float) $amount <= 0) {
+                throw \Illuminate\Validation\ValidationException::withMessages(["charges.{$i}.amount" => 'Give each additional charge a name and an amount.']);
+            }
+            $rows[] = ['name' => $name, 'amount' => round((float) $amount, 2)];
+        }
+
+        return $rows ?: null;
+    }
+
     public function updatedPairMode(): void
     {
         if ($this->pairMode === 'new' && $this->partnerWeight === '') {
@@ -347,7 +388,15 @@ class ItemForm extends Component
             return;
         }
 
+        try {
+            $chargesData = $this->chargesData();
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            $this->tab = 'piece';
+            throw $e;
+        }
+
         $data = [
+            'default_additional_charges' => $chargesData,
             'packet_id' => $this->packet_id,
             'huid_code' => $this->huid_code ?: null,
             'metal' => $this->metal,
@@ -485,6 +534,7 @@ class ItemForm extends Component
     {
         return view('livewire.stock.item-form', [
             'isDiamond' => $this->showForm && $this->isDiamond(),
+            'chargeNames' => $this->showForm ? \App\Support\ChargeNames::list() : [],
             'diamondCuts' => self::DIAMOND_CUTS,
             'categories' => $this->showForm ? ItemCategory::active()->forMetal($this->metal)->orderBy('sort_order')->orderBy('name')->get(['id', 'name']) : collect(),
             'packetsByBox' => $this->showForm

@@ -145,13 +145,19 @@ class NewSale extends Component
         }
         if ($order->stockItem && $order->stockItem->status === 'in_stock') {
             $this->cart[$order->stockItem->id] = $this->cartLine($order->stockItem);
+            $this->addDefaultCharges($order->stockItem);
         }
 
         // Pieces made for this order (karigar or hallmarking) that an admin has confirmed into stock.
         Item::where('status', 'in_stock')->where(function ($q) use ($order) {
             $q->whereIn('source_karigar_batch_id', $order->karigarBatches()->select('id'))
                 ->orWhereIn('source_hallmark_batch_id', $order->hallmarkBatches()->select('id'));
-        })->get()->each(fn ($piece) => $this->cart[$piece->id] ??= $this->cartLine($piece));
+        })->get()->each(function ($piece) {
+            if (! isset($this->cart[$piece->id])) {
+                $this->cart[$piece->id] = $this->cartLine($piece);
+                $this->addDefaultCharges($piece);
+            }
+        });
     }
 
     // ================================================================ steps
@@ -386,7 +392,16 @@ class NewSale extends Component
         }
 
         $this->cart[$itemId] = $this->cartLine($item);
+        $this->addDefaultCharges($item);
         $this->resetErrorBag('cart');
+    }
+
+    // The additional charges a piece carries by default start on the bill, tied to the piece. Staff can change or remove them on the charges step.
+    private function addDefaultCharges(Item $item): void
+    {
+        foreach ($item->defaultCharges() as $charge) {
+            $this->extras[] = ['name' => $charge['name'], 'amount' => (string) $charge['amount'], 'item_id' => $item->id];
+        }
     }
 
     /**
@@ -472,6 +487,8 @@ class NewSale extends Component
     public function removeItem(int $itemId): void
     {
         unset($this->cart[$itemId]);
+        // The charges that came with the piece go with it.
+        $this->extras = array_values(array_filter($this->extras, fn ($e) => (int) ($e['item_id'] ?? 0) !== $itemId));
     }
 
     // The offer made when a piece is still recorded as in the vault: move it out to the counter first.
@@ -856,6 +873,7 @@ class NewSale extends Component
                 ? app(ExchangeCredit::class)->available($this->customerId)
                     ->reject(fn ($x) => collect($this->payments)->contains(fn ($p) => ($p['exchange_id'] ?? null) === $x->id))->values()
                 : collect(),
+            'chargeNames' => $this->step === 3 ? \App\Support\ChargeNames::list() : [],
             'canOverride' => $this->canOverride(),
             'hasOrderWarning' => collect($this->cart)->contains(fn ($c) => $c['order'] !== null),
         ])->layout('components.layouts.app', ['title' => 'New Sale — Radharani Jewellery']);

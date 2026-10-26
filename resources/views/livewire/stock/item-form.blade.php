@@ -111,6 +111,25 @@
                             </div>
                         </x-ui.field>
                     </div>
+                    <div class="mt-4">
+                        <div class="flex items-baseline justify-between gap-3 mb-1.5">
+                            <span class="text-[13px] font-semibold text-ink_text-primary">Additional charges <span class="font-normal text-ink_text-muted">(optional)</span></span>
+                            <span class="text-[12px] text-ink_text-muted">Start on every bill for this piece. Not taxed.</span>
+                        </div>
+                        @foreach ($charges as $i => $c)
+                            <div class="flex gap-2 mb-2" wire:key="chg-{{ $i }}">
+                                <input type="text" wire:model="charges.{{ $i }}.name" list="rj-charge-names" maxlength="60" placeholder="What for, e.g. Sakha" class="rj-input flex-1 @error('charges.' . $i . '.name') is-invalid @enderror" aria-label="Charge name" autocomplete="off">
+                                <div class="relative w-[140px]">
+                                    <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px] text-ink_text-muted pointer-events-none">₹</span>
+                                    <input type="number" step="0.01" min="0" wire:model="charges.{{ $i }}.amount" class="rj-input pl-8 tabular @error('charges.' . $i . '.amount') is-invalid @enderror" aria-label="Charge amount">
+                                </div>
+                                <x-ui.button variant="ghost" size="icon-sm" icon="x" wire:click="removeCharge({{ $i }})" aria-label="Remove this charge" />
+                            </div>
+                            @error('charges.' . $i . '.amount')<p class="rj-error">{{ $message }}</p>@enderror
+                        @endforeach
+                        <datalist id="rj-charge-names">@foreach ($chargeNames as $n)<option value="{{ $n }}">@endforeach</datalist>
+                        <x-ui.button variant="secondary" size="sm" icon="plus" wire:click="addCharge">Add a charge</x-ui.button>
+                    </div>
                     @if ($metal === 'diamond')
                         <x-ui.field label="MRP" for="f-mrp" error="mrp" class="mt-4" hint="A diamond piece is priced at its MRP alone. No daily rate applies.">
                             <div class="relative max-w-[240px]">
