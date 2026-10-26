@@ -24,6 +24,8 @@ The tables below are the baseline; the 8 October change list changed them as fol
 
 **17 Oct:** `items.metal` and every other `metal` column are now `gold/silver/diamond`; `items.mrp` (diamond price); `customer_advances` (customer_id, kind received/used/refund, amount signed, mode, occasion, sale_id, note, user_id, created_at; insert-only); `sale_payments.mode` gains `advance`; `refinery_batches.origin` (stock/outside), `outside_note`, `extra_weight`; `karigar_batch_lines` (batch, description, pieces, weight); `raw_metal_entries.source_type` gains `opening`.
 
+**25 Oct (first round):** `sale_items` gains `weight_listed`, `weight_at_sale`, `weight_note`, `making_kind` (percentage/per_gram/per_piece), `making_default_rate`, `making_rate`, `making_amount` (written once with the sale); `sales.final_discount` (the discount after GST and the round-off; the old `discount`/`adjustment_*` stay for older sales and are 0/null on new ones); `sale_cancellations` (sale_id unique, reason, was_verified, held_on_account, credit_returned, user_id, created_at; insert-only); `items.default_additional_charges` (json list of name + amount); `reserved_codes` (code unique, user_id, created_at, used_item_id, used_at).
+
 **New tables:**
 - `locations` (name, type vault/counter/display/other, sort_order, is_active); `movements.location_id` (where a `vault_out` went), `movements.done_by_employee_id` (who physically did it; `user_id` stays the logged-in actor).
 - `item_categories` (metal, name, sort_order, is_active; unique per metal+name); `items.category_id`, `items.entry_batch_id`, `items.source_hallmark_batch_id`; soft deletes (`deleted_at`) on `boxes`, `packets`, `items`.
