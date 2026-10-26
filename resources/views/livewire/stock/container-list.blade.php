@@ -48,7 +48,7 @@
             @php
                 $isBox = $row->kind === 'box';
                 $href = route($isBox ? 'stock.boxes.show' : 'stock.packets.show', $row->id);
-                $isEmpty = (int) $row->items_count === 0 && (int) $row->child_count === 0;
+                $isEmpty = (int) $row->items_count === 0 && (int) $row->sold_count === 0 && (int) $row->child_count === 0;
             @endphp
             <tr wire:key="{{ $row->kind }}-{{ $row->id }}">
                 <td>
@@ -72,8 +72,16 @@
                     @if ($isBox) <span class="text-ink_text-muted">{{ $row->child_count }} {{ \Illuminate\Support\Str::plural('packet', $row->child_count) }}</span>
                     @elseif ($row->parent_code) <a href="{{ route('stock.boxes.show', $row->parent_id) }}" class="hover:text-gold-dark">{{ $row->parent_code }}</a>
                     @else <span class="text-ink_text-muted">No box</span> @endif
+                    @if ($vaults->count() > 1)
+                        <span class="block font-sans text-[11.5px] text-ink_text-muted">Kept in {{ $vaultNames[$row->vault_id ?: $defaultVaultId] ?? 'the vault' }}</span>
+                    @endif
                 </td>
-                <td class="text-right tabular">{{ $row->items_count }}</td>
+                <td class="text-right tabular">
+                    {{ $row->items_count }}
+                    @if ((int) $row->sold_count > 0)
+                        <span class="block text-[11.5px] font-normal text-ink_text-muted" title="Sold pieces stay on record here but are not counted">{{ $row->sold_count }} sold</span>
+                    @endif
+                </td>
                 <td class="text-right tabular text-ink_text-secondary">{{ (float) $row->weight ? number_format($row->weight, 3) . ' g' : '-' }}</td>
                 <td class="text-ink_text-secondary text-[12.5px] whitespace-nowrap">{{ \Illuminate\Support\Carbon::parse($row->created_at)->format('d M Y') }}</td>
                 <td>
@@ -107,6 +115,13 @@
                         @foreach ($boxes as $b)
                             <option value="{{ $b->id }}">{{ $b->code }}{{ $b->label ? ' · ' . $b->label : '' }}</option>
                         @endforeach
+                    </select>
+                </x-ui.field>
+            @endif
+            @if ($vaults->count() > 1 && ($formType === 'box' || ! $box_id))
+                <x-ui.field label="Kept in vault" for="c-vault" error="home_vault_id" hint="It goes back to this vault from the counter. Changing it moves it to the other vault.">
+                    <select id="c-vault" wire:model="home_vault_id" class="rj-select @error('home_vault_id') is-invalid @enderror">
+                        @foreach ($vaults as $vl)<option value="{{ $vl->id }}" @selected(($home_vault_id ?: $defaultVaultId) === $vl->id)>{{ $vl->name }}</option>@endforeach
                     </select>
                 </x-ui.field>
             @endif

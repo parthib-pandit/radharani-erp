@@ -28,7 +28,8 @@
                 <td class="text-ink_text-secondary">{{ $sale->creator->name ?? '—' }}</td>
                 <td class="text-[12.5px] text-ink_text-secondary whitespace-nowrap">{{ $sale->created_at?->format('d M Y, g:i a') }}</td>
                 <td>
-                    <div class="flex items-center justify-end">
+                    <div class="flex items-center justify-end gap-1.5">
+                        <x-ui.button variant="ghost" size="sm" icon="x-circle" wire:click="startCancel({{ $sale->id }})" target="startCancel" title="Cancel this sale">Cancel</x-ui.button>
                         <x-ui.button variant="primary" size="sm" icon="check" wire:click="startVerify({{ $sale->id }})" target="startVerify">Verify</x-ui.button>
                     </div>
                 </td>
@@ -49,7 +50,7 @@
     </x-ui.datatable>
 
     <x-ui.modal wire:model="showVerify" title="Verify this sale" icon="check-circle" max-width="md" submit="verify"
-        subtitle="The pieces become sold. This can not be undone. A balance does not stop verification.">
+        subtitle="The pieces become sold. Only an admin can cancel a sale after this. A balance does not stop verification.">
         <x-ui.field label="Tally bill number" for="vq-tally" error="tallyNumber" hint="The original bill number from Tally. It replaces the system's holding reference.">
             <input id="vq-tally" type="text" wire:model="tallyNumber" maxlength="50" class="rj-input rj-code @error('tallyNumber') is-invalid @enderror" autocomplete="off" autofocus>
         </x-ui.field>
@@ -58,4 +59,6 @@
             <x-ui.button type="submit" target="verify" icon="check">Verify sale</x-ui.button>
         </x-slot:footer>
     </x-ui.modal>
+
+    <x-sales.cancel-modal />
 </div>

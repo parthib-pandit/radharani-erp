@@ -160,11 +160,11 @@ class HierarchyConfigurator extends Component
 
     public function render()
     {
-        $boxes = Box::withCount(['packets', 'items'])
+        $boxes = Box::withCount(['packets', 'custodyItems as items_count'])
             ->when($this->boxSearch, fn ($q) => $q->where(fn ($q) => $q->where('code', 'like', "%{$this->boxSearch}%")->orWhere('label', 'like', "%{$this->boxSearch}%")))
             ->orderBy('code')->get();
 
-        $packets = Packet::withCount('items')->withSum('items', 'weight')
+        $packets = Packet::withCount('custodyItems as items_count')->withSum('custodyItems as items_sum_weight', 'weight')
             ->when($this->boxId === 'none', fn ($q) => $q->whereNull('box_id'), fn ($q) => $q->where('box_id', (int) $this->boxId))
             ->when($this->packetSearch, fn ($q) => $q->where(fn ($q) => $q->where('code', 'like', "%{$this->packetSearch}%")->orWhere('label', 'like', "%{$this->packetSearch}%")))
             ->orderBy('code')->get();
@@ -172,7 +172,7 @@ class HierarchyConfigurator extends Component
         $items = $this->packetId === ''
             ? collect()
             : Item::query()
-                ->when($this->packetId === 'none', fn ($q) => $q->whereNull('packet_id')->where('status', '!=', 'sold'), fn ($q) => $q->where('packet_id', (int) $this->packetId))
+                ->when($this->packetId === 'none', fn ($q) => $q->whereNull('packet_id')->where('status', '!=', 'sold'), fn ($q) => $q->where('packet_id', (int) $this->packetId)->where('status', '!=', 'sold'))
                 ->when($this->itemSearch, fn ($q) => $q->where(fn ($q) => $q
                     ->where('huid_code', 'like', "%{$this->itemSearch}%")
                     ->orWhere('internal_code', 'like', "%{$this->itemSearch}%")

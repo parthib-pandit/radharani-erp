@@ -88,6 +88,7 @@ class ReferralDesk extends Component
     {
         return DB::table('sales')->join('sale_items', 'sale_items.sale_id', '=', 'sales.id')->join('items', 'items.id', '=', 'sale_items.item_id')
             ->where('sales.confirmed_by_accountant', true)->whereNotNull('sales.referral_customer_id')
+            ->whereNotExists(fn ($q) => $q->selectRaw('1')->from('sale_cancellations')->whereColumn('sale_cancellations.sale_id', 'sales.id'))
             ->groupBy('sales.referral_customer_id')
             ->selectRaw('sales.referral_customer_id as id, SUM(COALESCE(items.net_weight, items.weight)) as grams, COUNT(DISTINCT sales.id) as sales, COUNT(DISTINCT sales.customer_id) as customers')
             ->get()->keyBy('id')->all();
@@ -102,10 +103,10 @@ class ReferralDesk extends Component
         $awarded = ReferralPoint::whereNotNull('sale_id')->pluck('sale_id')->all();
 
         return Sale::with(['customer:id,name', 'referrer:id,name', 'items'])
-            ->where('confirmed_by_accountant', true)->whereNotNull('referral_customer_id')->whereNotIn('id', $awarded ?: [0])
+            ->notCancelled()->where('confirmed_by_accountant', true)->whereNotNull('referral_customer_id')->whereNotIn('id', $awarded ?: [0])
             ->orderBy('id')->get()->map(function (Sale $sale) use ($rule) {
                 $grams = round($sale->items->sum(fn ($i) => (float) ($i->net_weight ?: $i->weight)), 3);
-                $first = ! Sale::where('customer_id', $sale->customer_id)->where('confirmed_by_accountant', true)->where('id', '<', $sale->id)->exists();
+                $first = ! Sale::notCancelled()->where('customer_id', $sale->customer_id)->where('confirmed_by_accountant', true)->where('id', '<', $sale->id)->exists();
                 $suggested = (int) round($grams * (float) $rule->points_per_gram) + ($first ? (int) $rule->first_sale_bonus : 0);
 
                 return ['sale' => $sale, 'grams' => $grams, 'first' => $first, 'suggested' => $suggested];
@@ -114,7 +115,7 @@ class ReferralDesk extends Component
 
     public function award(int $saleId): void
     {
-        $sale = Sale::whereNotNull('referral_customer_id')->where('confirmed_by_accountant', true)->findOrFail($saleId);
+        $sale = Sale::notCancelled()->whereNotNull('referral_customer_id')->where('confirmed_by_accountant', true)->findOrFail($saleId);
         if (ReferralPoint::where('sale_id', $saleId)->exists()) {
             return;
         }

@@ -151,9 +151,9 @@ class Dashboard extends Component
 
         // In-store places other than the vault (counters, displays...), by name.
         $names = Location::pluck('name', 'id');
-        $vaultId = Location::vault()?->id;
+        $vaultIds = collect(Location::vaultIds());
         $trayIds = Location::where('type', 'tray')->pluck('id');
-        $floor = collect(Location::itemLocations())->reject(fn ($l) => $l === $vaultId || $trayIds->contains($l))->countBy()
+        $floor = collect(Location::itemLocations())->reject(fn ($l) => $vaultIds->contains($l) || $trayIds->contains($l))->countBy()
             ->mapWithKeys(fn ($n, $id) => [$names[$id] ?? 'Counter' => $n]);
 
         $counterN = (int) $counter->n;
@@ -236,7 +236,7 @@ class Dashboard extends Component
             'detail' => $outOfVault->implode(', ') . '.',
         ]);
 
-        $unverified = Sale::where('confirmed_by_accountant', false);
+        $unverified = Sale::notCancelled()->where('confirmed_by_accountant', false);
         $add($can('sale.approve'), 'sales.verification', (clone $unverified)->count(), [
             'tone' => 'warning', 'icon' => 'receipt', 'title' => 'Sales to verify',
             'detail' => 'Held as reserved until confirmed.',
@@ -332,7 +332,7 @@ class Dashboard extends Component
             ];
         });
 
-        $sales = Sale::with(['customer:id,name', 'creator:id,name'])->latest('id')->limit(8)->get()
+        $sales = Sale::notCancelled()->with(['customer:id,name', 'creator:id,name'])->latest('id')->limit(8)->get()
             ->map(fn ($s) => [
                 'at' => $s->created_at,
                 'icon' => 'receipt',
@@ -356,7 +356,7 @@ class Dashboard extends Component
 
         return collect([
             ['route' => 'sales.new', 'label' => 'New sale', 'icon' => 'receipt', 'can' => 'sale.create',
-                'count' => Sale::whereDate('created_at', today())->count()],
+                'count' => Sale::notCancelled()->whereDate('created_at', today())->count()],
             ['scan' => true, 'label' => 'Scan a tag', 'icon' => 'scan'],
             ['route' => 'movements.vault-counter', 'label' => 'Vault ↔ Counter', 'icon' => 'repeat',
                 'count' => $sum('vault_out', 'vault_in')],

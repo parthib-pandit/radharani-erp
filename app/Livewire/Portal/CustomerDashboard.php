@@ -40,7 +40,7 @@ class CustomerDashboard extends Component
         }
 
         $customer = Auth::guard('customer')->user()->load([
-            'sales' => fn ($q) => $q->orderByDesc('created_at'),
+            'sales' => fn ($q) => $q->notCancelled()->orderByDesc('created_at'),
             'sales.items.images',
             'installmentSchemes' => fn ($q) => $q->orderByDesc('start_date'),
             'installmentSchemes.payments' => fn ($q) => $q->orderBy('paid_on'),
@@ -51,7 +51,7 @@ class CustomerDashboard extends Component
         return view('livewire.portal.customer-dashboard', [
             'customer' => $customer,
             // People who bought with this customer's code, and the referral points earned (8 Oct change list, 15.1).
-            'referredBuyers' => \App\Models\Sales\Sale::where('referral_customer_id', $customer->id)->where('confirmed_by_accountant', true)->with('customer:id,name')->get()->groupBy('customer_id'),
+            'referredBuyers' => \App\Models\Sales\Sale::notCancelled()->where('referral_customer_id', $customer->id)->where('confirmed_by_accountant', true)->with('customer:id,name')->get()->groupBy('customer_id'),
             'referralPoints' => (int) \App\Models\Customer\ReferralPoint::where('customer_id', $customer->id)->sum('points'),
             'saleInvoices' => $saleInvoices,
             'firstName' => strtok(trim($customer->name), ' ') ?: $customer->name,

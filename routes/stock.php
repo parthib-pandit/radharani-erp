@@ -20,6 +20,9 @@ use App\Livewire\Stock\BulkImport;
 use App\Livewire\Stock\HierarchyConfigurator;
 use App\Http\Controllers\Stock\QrController;
 
+// The search inside the camera scanner: any signed-in staff member can scan, so this is outside the stock.manage gate.
+Route::middleware('auth')->get('/stock/scan/search', \App\Http\Controllers\Stock\ScanSearchController::class)->name('stock.scan.search');
+
 // Stock module — behind auth + the stock.manage permission gate.
 Route::middleware(['auth', 'permission:stock.manage'])->prefix('stock')->group(function () {
     Route::get('/audit', StockAuditPage::class)->middleware('permission:stock.audit')->name('stock.audit');

@@ -19,7 +19,7 @@ class Sale extends Model
     protected $casts = ['additional_charges' => 'array', 'created_at' => 'datetime'];
     protected $fillable = [
         'customer_id', 'referral_customer_id', 'invoice_number', 'type',
-        'additional_charges', 'discount', 'gst_jewellery_percent', 'gst_hallmark_percent', 'gst_amount', 'gst_hallmark_amount', 'round_off', 'adjustment_type', 'adjustment_value', 'accountant_note',
+        'additional_charges', 'discount', 'gst_jewellery_percent', 'gst_hallmark_percent', 'gst_amount', 'gst_hallmark_amount', 'round_off', 'final_discount', 'adjustment_type', 'adjustment_value', 'accountant_note',
         'order_override_note', 'total', 'confirmed_by_accountant', 'created_by',
     ];
 
@@ -36,12 +36,28 @@ class Sale extends Model
     public function items()
     {
         return $this->belongsToMany(\App\Models\Stock\Item::class, 'sale_items')
-            ->withPivot('price_at_sale');
+            ->withPivot('price_at_sale', 'weight_listed', 'weight_at_sale', 'weight_note', 'making_kind', 'making_default_rate', 'making_rate', 'making_amount');
     }
 
     public function payments()
     {
         return $this->hasMany(SalePayment::class);
+    }
+
+    public function cancellation()
+    {
+        return $this->hasOne(SaleCancellation::class);
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->relationLoaded('cancellation') ? $this->cancellation !== null : $this->cancellation()->exists();
+    }
+
+    /** Sales that still stand: everything but the cancelled ones. */
+    public function scopeNotCancelled($query)
+    {
+        return $query->whereDoesntHave('cancellation');
     }
 
     public function referrer()

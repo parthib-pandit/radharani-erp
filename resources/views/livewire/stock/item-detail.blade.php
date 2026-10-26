@@ -29,6 +29,9 @@
             @endif
         </x-slot:meta>
         <x-slot:actions>
+            @if ($item->status === 'in_stock' && auth()->user()?->can('sale.create'))
+                <x-ui.button icon="receipt" :href="route('sales.new', ['item' => $item->id])">Add sale</x-ui.button>
+            @endif
             <x-ui.button variant="secondary" icon="package" wire:click="openMove">{{ $item->packet ? 'Move' : 'Put in packet' }}</x-ui.button>
             @if (! $item->deletionBlocker())
                 <x-ui.button variant="danger-soft" icon="trash"
@@ -129,6 +132,9 @@
             <x-ui.card title="Pricing setup" icon="coins">
                 <dl class="rj-dl">
                     <div class="col-span-2"><dt>Making charge</dt><dd>{{ $makingLabel }} · <span class="tabular">{{ $makingValue }}</span></dd></div>
+                    @if ($item->defaultCharges())
+                        <div class="col-span-2"><dt>Additional charges</dt><dd>@foreach ($item->defaultCharges() as $c){{ $c['name'] }} <span class="tabular">₹{{ number_format($c['amount'], 2) }}</span>{{ ! $loop->last ? ' · ' : '' }}@endforeach <span class="text-[12px] text-ink_text-muted">on every bill, not taxed</span></dd></div>
+                    @endif
                 </dl>
                 @if ($price)
                     <div class="mt-4 pt-4 border-t border-line-light space-y-2 text-[13px]">

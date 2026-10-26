@@ -41,7 +41,8 @@ class VaultCounterMove extends Component
         $this->reset(['tray', 'feedback']);
     }
 
-    // Going back to the vault: optionally onto one of its trays (a tray is a place inside the vault).
+    // Going back: empty means each thing goes to the vault it was kept in. Or a vault to send them all to (a box or packet kept
+    // elsewhere is then moved there), or a tray, which is a place inside one of the vaults. Pieces follow their packet.
     public ?int $vaultTrayId = null;
 
     public function updatedVaultTrayId(): void
@@ -166,11 +167,12 @@ class VaultCounterMove extends Component
         if ($this->direction === 'to_vault') {
             $current = Location::latestVaultMove($type, $model->id);
             $currentTray = $current?->movement_type === 'vault_in' && $this->isTray($current->location_id) ? (int) $current->location_id : null;
+            $trayChosen = $this->isTray($this->vaultTrayId) ? $this->vaultTrayId : null;
 
-            if ($this->vaultTrayId) {
+            if ($trayChosen) {
                 // Putting it on a tray: from the counter, from the vault or from another tray are all fine.
-                if ($current?->movement_type !== 'vault_out' && $currentTray === $this->vaultTrayId) {
-                    $this->feedback('info', $label, 'Already on ' . (Location::find($this->vaultTrayId)?->name ?? 'that tray') . '.');
+                if ($current?->movement_type !== 'vault_out' && $currentTray === $trayChosen) {
+                    $this->feedback('info', $label, 'Already on ' . (Location::find($trayChosen)?->name ?? 'that tray') . '.');
                     return;
                 }
             } elseif ($current?->movement_type !== 'vault_out') {
@@ -224,13 +226,15 @@ class VaultCounterMove extends Component
             'trackable_type' => $type,
             'trackable_id' => $id,
             'movement_type' => 'vault_in',
-            'location_id' => Location::vault()?->id,
+            'location_id' => $place = $this->returnPlaceFor($type, $id),
             'purpose_label' => 'Closing stock',
             'user_id' => Auth::id(),
             'weight_at_dispatch' => $type === 'item' ? (float) $model->weight : null,
         ]);
 
-        $this->dispatch('toast', message: ($type === 'item' ? $model->label : $model->code) . ' returned to the vault.', type: 'success');
+        $this->keepIn($type, $id, $place);
+
+        $this->dispatch('toast', message: ($type === 'item' ? $model->label : $model->code) . ' returned to ' . (Location::find(Location::vaultOfPlace($place))?->name ?? 'the vault') . '.', type: 'success');
     }
 
     public function removeFromTray(int $index): void
@@ -265,7 +269,7 @@ class VaultCounterMove extends Component
 
                 // Re-check the record too: a second click or a second tab must not write the same move twice.
                 $last = $this->lastVaultMove($t['type'], $t['id']);
-                $vaultPlace = $this->vaultTrayId ?: Location::vault()?->id;
+                $vaultPlace = $this->returnPlaceFor($t['type'], $t['id']);
                 $already = $type === 'vault_out'
                     ? $last?->movement_type === 'vault_out' && ($last->location_id ?? Location::defaultFloor()?->id) === $this->locationId
                     : $last?->movement_type === 'vault_in' && ($last->location_id ?? Location::vault()?->id) === $vaultPlace;
@@ -280,17 +284,21 @@ class VaultCounterMove extends Component
                     'trackable_id' => $t['id'],
                     'movement_type' => $type,
                     'location_id' => $type === 'vault_out' ? $this->locationId : $vaultPlace,
-                    'purpose_label' => $type === 'vault_out' ? (! empty($t['placeChange']) ? 'Place change' : 'Counter display') : ($this->vaultTrayId ? 'Placed on a tray' : 'Closing stock'),
+                    'purpose_label' => $type === 'vault_out' ? (! empty($t['placeChange']) ? 'Place change' : 'Counter display') : ($this->isTray($vaultPlace) ? 'Placed on a tray' : 'Closing stock'),
                     'user_id' => Auth::id(),
                     'weight_at_dispatch' => $t['weight'],
                 ]);
+                if ($type === 'vault_in') {
+                    $this->keepIn($t['type'], $t['id'], $vaultPlace);
+                }
             }
         });
 
         $moved = count($this->tray) - count($skipped);
         $where = $this->direction === 'to_counter'
             ? 'sent to ' . (Location::find($this->locationId)?->name ?? 'the counter')
-            : ($this->vaultTrayId ? 'put on ' . (Location::find($this->vaultTrayId)?->name ?? 'a tray') : 'returned to the vault');
+            : ($this->isTray($this->vaultTrayId) ? 'put on ' . (Location::find($this->vaultTrayId)?->name ?? 'a tray')
+                : ($this->vaultTrayId ? 'returned to ' . (Location::find($this->vaultTrayId)?->name ?? 'the vault') : 'returned to the vault each was kept in'));
         $this->dispatch('toast', message: "{$moved} " . \Illuminate\Support\Str::plural('entry', $moved) . " {$where}.", type: 'success');
         if ($skipped) {
             $this->dispatch('toast', message: 'Skipped ' . implode(', ', $skipped) . ': no longer available, or already recorded.', type: 'warning');
@@ -298,6 +306,29 @@ class VaultCounterMove extends Component
 
         $this->reset(['tray', 'feedback']);
         $this->dispatch('scan-ready');
+    }
+
+    /** Where a return goes: the place picked (a tray, or a vault for a box or packet), else the vault the thing is kept in. */
+    private function returnPlaceFor(string $type, int $id): ?int
+    {
+        if ($this->vaultTrayId && ($this->isTray($this->vaultTrayId) || $type !== 'item')) {
+            return $this->vaultTrayId;
+        }
+
+        return Location::vaultOf($type, $id);
+    }
+
+    /** A box, or a packet that is not in a box, returned to a different vault is now kept there. */
+    private function keepIn(string $type, int $id, ?int $place): void
+    {
+        $vaultId = Location::vaultOfPlace($place);
+        if (! $vaultId || $type === 'item' || $vaultId === Location::vaultOf($type, $id)) {
+            return;
+        }
+        $model = $type === 'box' ? Box::find($id) : Packet::find($id);
+        if ($model && ! ($type === 'packet' && $model->box_id)) {
+            $model->update(['home_vault_id' => $vaultId]);
+        }
     }
 
     private function isTray($locationId): bool
@@ -450,7 +481,8 @@ class VaultCounterMove extends Component
                 'place' => $places[$m->location_id ?? $defaultFloor] ?? null,
                 'since' => $m->created_at,
                 'by' => $m->user?->name,
-                'sold' => in_array($status, ['sold', 'reserved'], true),
+                'sold' => in_array($status, ['sold', 'reserved'], true), // out of the shop's hands either way: not expected back
+                'status' => $status,
                 'scanned' => $inTray->has($m->trackable_type . ':' . $m->trackable_id),
             ];
         });
@@ -463,12 +495,15 @@ class VaultCounterMove extends Component
                 'item' => $r['model']?->packet?->code,
                 default => null,
             };
-            $r['soldInside'] = match ($r['type']) {
-                'packet' => Item::where('packet_id', $r['model']?->id)->whereIn('status', ['sold', 'reserved'])->count(),
+            // Sold pieces are out of custody; reserved ones (in a sale nobody has verified yet) are only held back.
+            $inside = fn (string $status) => match ($r['type']) {
+                'packet' => Item::where('packet_id', $r['model']?->id)->where('status', $status)->count(),
                 'box' => Item::whereIn('packet_id', \App\Models\Stock\Packet::where('box_id', $r['model']?->id)->select('id'))
-                    ->whereIn('status', ['sold', 'reserved'])->count(),
+                    ->where('status', $status)->count(),
                 default => 0,
             };
+            $r['soldInside'] = $inside('sold');
+            $r['reservedInside'] = $inside('reserved');
 
             return $r;
         });
@@ -500,6 +535,8 @@ class VaultCounterMove extends Component
             ],
             'locations' => Location::active()->floor()->orderBy('sort_order')->orderBy('id')->get(['id', 'name']),
             'vaultTrays' => Location::active()->where('type', 'tray')->orderBy('sort_order')->orderBy('id')->get(['id', 'name']),
+            'vaultPlaces' => Location::active()->where('type', 'vault')->orderBy('sort_order')->orderBy('id')->get(['id', 'name'])
+                ->each(fn ($v) => $v->setRelation('trays', Location::active()->where('type', 'tray')->where('parent_id', $v->id)->orderBy('sort_order')->orderBy('id')->get(['id', 'name']))),
             'found' => $this->searchResults(),
             'trayWeight' => collect($this->tray)->sum('weight'),
         ])->layout('components.layouts.app', ['title' => 'Vault ↔ Counter · Radharani Jewellery']);

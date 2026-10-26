@@ -1,8 +1,10 @@
 <?php
 namespace App\Livewire\Sales;
 
+use App\Livewire\Concerns\CancelsSales;
 use App\Models\Sales\Sale;
 use App\Models\Sales\SalePayment;
+use App\Services\SaleCanceller;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
@@ -12,6 +14,8 @@ use Livewire\Component;
  */
 class InvoiceView extends Component
 {
+    use CancelsSales;
+
     public Sale $sale;
 
     public string $mode = 'cash';
@@ -27,6 +31,7 @@ class InvoiceView extends Component
     public function addPayment(): void
     {
         abort_unless(Auth::user()?->can('sale.create'), 403);
+        abort_if(Sale::findOrFail($this->sale->id)->isCancelled(), 422, 'This sale is cancelled.');
         $this->validate([
             'mode' => ['required', 'in:cash,upi,card,bank'],
             'amount' => ['required', 'numeric', 'min:0.01'],
@@ -47,9 +52,9 @@ class InvoiceView extends Component
 
     public function render()
     {
-        $sale = Sale::with('customer', 'items', 'creator', 'referrer', 'payments.user')->findOrFail($this->sale->id);
+        $sale = Sale::with('customer', 'items', 'creator', 'referrer', 'payments.user', 'cancellation.user')->findOrFail($this->sale->id);
 
-        return view('livewire.sales.invoice-view', ['sale' => $sale, 'modes' => SalePayment::MODES])
+        return view('livewire.sales.invoice-view', ['sale' => $sale, 'modes' => SalePayment::MODES, 'canCancel' => SaleCanceller::allowed($sale)])
             ->layout('components.layouts.app', ['title' => "Sale {$sale->bill_number} — Radharani Jewellery"]);
     }
 }

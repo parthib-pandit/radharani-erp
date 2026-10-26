@@ -107,8 +107,13 @@ class LedgerService
         $paid = 0.0;
         $running = 0.0;
 
-        $sales = $customer->sales()->with('payments')->orderBy('id')->get();
+        $allSales = $customer->sales()->with('payments', 'cancellation')->orderBy('id')->get();
+        $sales = $allSales->reject(fn ($s) => $s->cancellation);
         $events = collect();
+        // A cancelled sale is neither billed nor paid: a note says so, and what it paid is held as an advance (below).
+        foreach ($allSales->filter(fn ($s) => $s->cancellation) as $sale) {
+            $events->push(['at' => $sale->cancellation->created_at, 'info' => true, 'label' => "Sale #{$sale->id} cancelled: {$sale->cancellation->reason}"]);
+        }
         foreach ($sales as $sale) {
             $events->push(['at' => $sale->created_at, 'label' => 'Sale ' . $sale->bill_number . ' (' . $sale->items()->count() . ' ' . \Illuminate\Support\Str::plural('piece', $sale->items()->count()) . ')', 'billed' => (float) $sale->total, 'paid' => 0.0]);
             foreach ($sale->payments as $p) {
@@ -150,7 +155,7 @@ class LedgerService
         }
         // Advance paid in with no order behind it: notes too (a sale that uses it shows it as a payment above).
         foreach (\App\Models\Customer\CustomerAdvance::where('customer_id', $customer->id)->where('kind', 'received')->orderBy('id')->get() as $a) {
-            $events->push(['at' => $a->created_at, 'info' => true, 'label' => 'Advance ₹' . number_format((float) $a->amount, 2) . ' received by ' . \App\Models\Customer\CustomerAdvance::MODES[$a->mode] . ($a->occasion ? " ({$a->occasion})" : '') . ', held until a sale uses it']);
+            $events->push(['at' => $a->created_at, 'info' => true, 'label' => 'Advance ₹' . number_format((float) $a->amount, 2) . ($a->mode ? ' received by ' . \App\Models\Customer\CustomerAdvance::MODES[$a->mode] : ' returned') . ($a->occasion ? " ({$a->occasion})" : '') . ', held until a sale uses it']);
         }
         $credit = round($exchanges->sum(fn ($x) => $x->creditRemaining()), 2);
         $advance = app(AdvanceService::class)->balance($customer->id);

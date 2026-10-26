@@ -5,7 +5,7 @@ $user = auth()->user();
 
 // Live counts for queues that need someone's attention.
 $pendingReview = \App\Models\Stock\Item::where('status', 'pending_review')->count();
-$pendingSales = \App\Models\Sales\Sale::where('confirmed_by_accountant', false)->count();
+$pendingSales = \App\Models\Sales\Sale::notCancelled()->where('confirmed_by_accountant', false)->count();
 $pendingMessages = \App\Models\Notification\PendingNotification::where('status', 'pending')->count();
 
 // Single source for the whole navigation. 'can' is a permission (or list, any-of) gate.
@@ -61,6 +61,7 @@ $nav = [
         ['route' => 'purchases.new', 'label' => 'New Purchase'],
         ['route' => 'purchases.list', 'label' => 'Purchase List'],
     ]],
+    ['type' => 'link', 'route' => 'cashbook', 'label' => 'Cash Book', 'icon' => 'wallet', 'can' => 'cashbook.manage'],
     ['type' => 'link', 'route' => 'notifications.queue', 'label' => 'Messages', 'icon' => 'bell', 'badge' => $pendingMessages],
     ['type' => 'link', 'route' => 'referral', 'label' => 'Referral', 'icon' => 'gift', 'can' => 'referral.manage'],
     ['key' => 'installments', 'label' => 'Installments', 'icon' => 'calendar', 'can' => 'customer.manage', 'items' => [

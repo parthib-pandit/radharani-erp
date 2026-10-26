@@ -60,9 +60,60 @@ class Location extends Model
         return $q->whereNotIn('type', ['vault', 'tray']);
     }
 
+    /** The first vault: where everything starts, and where a box with no vault of its own is kept. */
     public static function vault(): ?self
     {
-        return static::where('type', 'vault')->orderBy('id')->first();
+        return static::where('type', 'vault')->orderByDesc('is_active')->orderBy('sort_order')->orderBy('id')->first();
+    }
+
+    /** Every vault, switched off ones too (past movements point at them). */
+    public static function vaultIds(): array
+    {
+        return static::where('type', 'vault')->pluck('id')->all();
+    }
+
+    /** The vault a place belongs to: a vault is itself, a tray is in its parent vault. */
+    public static function vaultOfPlace(?int $locationId): ?int
+    {
+        if (! $locationId) {
+            return null;
+        }
+        $l = static::find($locationId, ['id', 'type', 'parent_id']);
+
+        return match ($l?->type) {
+            'vault' => $l->id,
+            'tray' => $l->parent_id,
+            default => null,
+        };
+    }
+
+    /**
+     * The vault a box, a packet or a piece is kept in. A box has its own; a packet follows its box, or has its own when it
+     * is not in one; a piece follows its packet. Nothing set means the first vault.
+     */
+    public static function vaultOf(string $type, int $id): ?int
+    {
+        $default = static::vault()?->id;
+
+        return match ($type) {
+            'box' => Box::withTrashed()->whereKey($id)->value('home_vault_id') ?: $default,
+            'packet' => (function () use ($id, $default) {
+                $p = Packet::withTrashed()->find($id, ['id', 'box_id', 'home_vault_id']);
+
+                return ($p ? ($p->box_id ? Box::withTrashed()->whereKey($p->box_id)->value('home_vault_id') : $p->home_vault_id) : null) ?: $default;
+            })(),
+            'item' => ($packetId = Item::withTrashed()->whereKey($id)->value('packet_id')) ? static::vaultOf('packet', (int) $packetId) : $default,
+            default => $default,
+        };
+    }
+
+    /** Boxes and loose packets kept in this vault (a box or packet with no vault of its own counts for the first one). */
+    public function keptCount(): int
+    {
+        $isDefault = $this->id === static::vault()?->id;
+        $match = fn ($q) => $q->where('home_vault_id', $this->id)->when($isDefault, fn ($q) => $q->orWhereNull('home_vault_id'));
+
+        return Box::where($match)->count() + Packet::whereNull('box_id')->where($match)->count();
     }
 
     /** Where a vault_out with no recorded location (older rows) is taken to have gone. */
@@ -155,6 +206,10 @@ class Location extends Model
         $default = static::defaultFloor()?->id;
         $vault = static::vault()?->id;
         $packetBox = Packet::pluck('box_id', 'id');
+        // The vault each packet is kept in: its box's, or its own when it is not in a box. A piece in the vault is in its packet's vault.
+        $boxHome = Box::pluck('home_vault_id', 'id');
+        $packetVault = Packet::get(['id', 'box_id', 'home_vault_id'])
+            ->mapWithKeys(fn ($p) => [$p->id => ($p->box_id ? ($boxHome[$p->box_id] ?? null) : $p->home_vault_id) ?: $vault]);
 
         $latest = Movement::selectRaw('MAX(id)')->whereIn('movement_type', Movement::PAIRS['vault'])
             ->groupBy('trackable_type', 'trackable_id');
@@ -165,7 +220,7 @@ class Location extends Model
         $trays = static::where('type', 'tray')->pluck('id')->flip();
 
         $out = [];
-        Item::where('status', 'in_stock')->get(['id', 'packet_id'])->each(function ($item) use ($moves, $packetBox, $vault, $default, $trays, &$out) {
+        Item::where('status', 'in_stock')->get(['id', 'packet_id'])->each(function ($item) use ($moves, $packetBox, $packetVault, $vault, $default, $trays, &$out) {
             $box = $item->packet_id ? ($packetBox[$item->packet_id] ?? null) : null;
             $last = collect([
                 $moves->get('item:' . $item->id),
@@ -177,7 +232,7 @@ class Location extends Model
             $out[$item->id] = match (true) {
                 $last && $last->movement_type === 'vault_out' => $last->location_id ?? $default,
                 $last && $trays->has($last->location_id) => (int) $last->location_id,
-                default => $vault,
+                default => $item->packet_id ? ($packetVault[$item->packet_id] ?? $vault) : $vault,
             };
         });
 

@@ -49,6 +49,10 @@ class NewSale extends Component
     public ?int $schemeId = null;
 
 
+    // A piece to put on the bill from the start: "Add sale" on a piece's own page.
+    #[Url(as: 'item', except: '')]
+    public ?int $startItemId = null;
+
     // ---- 1. customer
     public string $customerSearch = '';
     #[Url(as: 'customer', except: '')]
@@ -70,8 +74,9 @@ class NewSale extends Component
 
     // ---- 3. charges
     public array $extras = [];            // [['name' => ..., 'amount' => ...]]
-    public string $adjustType = 'flat';   // flat | percent
-    public $adjustValue = '';
+    // The bargain discount at the very end (after GST and the round-off, as Tally's "Discount Sales"): an amount, or the final price to pay.
+    public string $finalType = 'flat';    // flat | final
+    public $finalValue = '';
 
     // ---- 4. payment
     public array $payments = [['mode' => 'cash', 'amount' => '']];
@@ -111,6 +116,16 @@ class NewSale extends Component
         if ($this->customerId && ! Customer::whereKey($this->customerId)->exists()) {
             $this->customerId = null;
         }
+        if ($this->startItemId) {
+            $piece = Item::find($this->startItemId);
+            $this->startItemId = null; // only starts the bill: the piece can be taken off like any other
+            if ($piece && $piece->status === 'in_stock') {
+                $this->cart[$piece->id] = $this->cartLine($piece);
+                $this->addDefaultCharges($piece);
+            } elseif ($piece) {
+                $this->dispatch('toast', message: "{$piece->label} is " . str_replace('_', ' ', $piece->status) . ' and can not be billed.', type: 'error');
+            }
+        }
         if ($this->customerId) {
             $this->step = max($this->step, 2);
             $this->reach = max($this->reach, 2);
@@ -144,13 +159,19 @@ class NewSale extends Component
         }
         if ($order->stockItem && $order->stockItem->status === 'in_stock') {
             $this->cart[$order->stockItem->id] = $this->cartLine($order->stockItem);
+            $this->addDefaultCharges($order->stockItem);
         }
 
         // Pieces made for this order (karigar or hallmarking) that an admin has confirmed into stock.
         Item::where('status', 'in_stock')->where(function ($q) use ($order) {
             $q->whereIn('source_karigar_batch_id', $order->karigarBatches()->select('id'))
                 ->orWhereIn('source_hallmark_batch_id', $order->hallmarkBatches()->select('id'));
-        })->get()->each(fn ($piece) => $this->cart[$piece->id] ??= $this->cartLine($piece));
+        })->get()->each(function ($piece) {
+            if (! isset($this->cart[$piece->id])) {
+                $this->cart[$piece->id] = $this->cartLine($piece);
+                $this->addDefaultCharges($piece);
+            }
+        });
     }
 
     // ================================================================ steps
@@ -171,24 +192,6 @@ class NewSale extends Component
         $this->step = min(5, $this->step + 1);
         $this->reach = max($this->reach, $this->step);
         $this->refreshCart();
-        if ($this->step === 4) {
-            $this->prefillPayment();
-        }
-    }
-
-    // The adjustment now sits on the payment step, so the payment line filled in for the balance follows it.
-    public function updatedAdjustValue(): void
-    {
-        $this->followAdjustment();
-    }
-
-    public function updatedAdjustType(): void
-    {
-        $this->followAdjustment();
-    }
-
-    private function followAdjustment(): void
-    {
         if ($this->step === 4) {
             $this->prefillPayment();
         }
@@ -238,6 +241,14 @@ class NewSale extends Component
 
                 return false;
             }
+            foreach ($this->cart as $id => $c) {
+                $w = trim((string) ($c['weight_input'] ?? ''));
+                if ($w !== '' && (! is_numeric($w) || (float) $w <= 0)) {
+                    $this->addError("cart.{$id}.weight_input", 'Enter a weight above 0, or leave it as the piece weight.');
+
+                    return false;
+                }
+            }
             $this->refreshCart();
             if (collect($this->cart)->contains('inVault', true)) {
                 $this->addError('cart', 'Some pieces are still recorded as in the vault. Move them to the counter first.');
@@ -267,12 +278,20 @@ class NewSale extends Component
                 }
             }
         }
-        if ($step === 4) {
-            if ($this->adjustValue !== '' && (! is_numeric($this->adjustValue) || (float) $this->adjustValue < 0 || ($this->adjustType === 'percent' && (float) $this->adjustValue > 100))) {
-                $this->addError('adjustValue', $this->adjustType === 'percent' ? 'Enter a percentage between 0 and 100.' : 'Enter an amount.');
+        if ($step === 3 && trim((string) $this->finalValue) !== '') {
+            $bill = $this->totals();
+            if (! is_numeric($this->finalValue) || (float) $this->finalValue < 0) {
+                $this->addError('finalValue', 'Enter an amount.');
 
                 return false;
             }
+            if ($bill['final_discount_wanted'] > $bill['final_discount_cap'] + 0.005) {
+                $this->addError('finalValue', 'The discount can not be more than ₹' . number_format($bill['final_discount_cap'], 2) . ', the making charge left on this bill with its GST. The metal is never discounted.');
+
+                return false;
+            }
+        }
+        if ($step === 4) {
             foreach ($this->payments as $i => $p) {
                 if (($p['amount'] ?? '') !== '' && (! is_numeric($p['amount']) || (float) $p['amount'] < 0)) {
                     $this->addError("payments.{$i}.amount", 'Enter an amount.');
@@ -387,23 +406,54 @@ class NewSale extends Component
         }
 
         $this->cart[$itemId] = $this->cartLine($item);
+        $this->addDefaultCharges($item);
         $this->resetErrorBag('cart');
     }
 
-    private function cartLine(Item $item): array
+    // The additional charges a piece carries by default start on the bill, tied to the piece. Staff can change or remove them on the charges step.
+    private function addDefaultCharges(Item $item): void
+    {
+        foreach ($item->defaultCharges() as $charge) {
+            $this->extras[] = ['name' => $charge['name'], 'amount' => (string) $charge['amount'], 'item_id' => $item->id];
+        }
+    }
+
+    /**
+     * One piece on the bill. $input is what staff changed on this bill (never the piece): the weight to price it at,
+     * a note for that, and a making charge bargained as a rate or an amount. Everything else is worked out again here.
+     */
+    private function cartLine(Item $item, array $input = []): array
     {
         $order = Order::openForItem($item->id);
         if ($order && $this->orderId && $order->id === $this->orderId) {
             $order = null; // selling it to the customer it is held for
         }
 
+        $weightInput = trim((string) ($input['weight_input'] ?? ''));
+        $set = is_array($input['making_set'] ?? null) ? $input['making_set'] : null;
+
         $pricing = app(PricingService::class);
-        $b = $pricing->breakdown($item);
+        $b = $pricing->breakdown($item, [
+            'weight' => is_numeric($weightInput) && (float) $weightInput > 0 ? (float) $weightInput : null,
+            'making_rate' => $set['rate'] ?? null,
+            'making_amount' => $set['amount'] ?? null,
+        ]);
+        $bargained = abs((float) $b['making_rate'] - (float) $b['making_default_rate']) > 0.004;
 
         return [
             'label' => $item->label,
             'category' => $item->category,
-            'weight' => (float) $item->weight,
+            'weight' => $b['weight'],                 // what the price is worked on
+            'weight_listed' => $b['weight_listed'],   // what the piece's record says
+            'weight_input' => $weightInput,
+            'weight_note' => (string) ($input['weight_note'] ?? ''),
+            'metal_value' => $b['metal_value'],
+            'making_kind' => $b['making_kind'],
+            'making_rate' => (float) $b['making_rate'],
+            'making_default' => (float) $b['making_default_rate'],
+            'making_min' => (float) $b['making_min_rate'],
+            'making_saved' => $bargained ? round((float) $b['making_at_default'] - (float) $b['making'], 2) : 0.0,
+            'making_set' => $bargained ? (isset($set['amount']) ? ['amount' => (float) $b['making']] : ['rate' => (float) $b['making_rate']]) : null,
             'price' => $b['total'],
             'taxable' => $b['taxable'],
             'huid' => $b['huid_charge'], // the hallmarking part of the price, which has its own GST rate
@@ -415,17 +465,44 @@ class NewSale extends Component
         ];
     }
 
-    // Prices and the vault check are read again whenever the screen moves on.
+    // Prices and the vault check are read again whenever the screen moves on. What staff changed on a piece stays.
     private function refreshCart(): void
     {
         foreach (Item::whereKey(array_keys($this->cart))->get() as $item) {
-            $this->cart[$item->id] = $this->cartLine($item);
+            $this->cart[$item->id] = $this->cartLine($item, $this->cart[$item->id]);
         }
+    }
+
+    // A weight or a note typed on a piece prices it again. Any other key sent for a line is overwritten by the same sum.
+    public function updatedCart($value, string $key): void
+    {
+        $id = (int) explode('.', $key, 2)[0];
+        if (isset($this->cart[$id]) && ($item = Item::find($id))) {
+            $this->cart[$id] = $this->cartLine($item, $this->cart[$id]);
+        }
+    }
+
+    // The making charge bargained on one piece, as a rate (the slider) or as the amount. Both stay inside what the pricing allows.
+    public function setMaking(int $itemId, string $by, $value): void
+    {
+        if (! isset($this->cart[$itemId]) || ! ($item = Item::find($itemId))) {
+            return;
+        }
+        $line = $this->cart[$itemId];
+        $line['making_set'] = is_numeric($value) ? [$by === 'amount' ? 'amount' : 'rate' => (float) $value] : null;
+        $this->cart[$itemId] = $this->cartLine($item, $line);
+    }
+
+    public function resetMaking(int $itemId): void
+    {
+        $this->setMaking($itemId, 'rate', null);
     }
 
     public function removeItem(int $itemId): void
     {
         unset($this->cart[$itemId]);
+        // The charges that came with the piece go with it.
+        $this->extras = array_values(array_filter($this->extras, fn ($e) => (int) ($e['item_id'] ?? 0) !== $itemId));
     }
 
     // The offer made when a piece is still recorded as in the vault: move it out to the counter first.
@@ -436,9 +513,17 @@ class NewSale extends Component
         if (Location::isInVault($item)) {
             Location::sendToFloor($item);
         }
-        $this->cart[$itemId] = $this->cartLine($item);
+        $this->cart[$itemId] = $this->cartLine($item, $this->cart[$itemId] ?? []);
         $this->resetErrorBag('cart');
         $this->dispatch('toast', message: "{$item->label} moved to the counter.", type: 'success');
+    }
+
+    // Cancel the bill at any point: nothing has been saved yet, so nothing is held or paid, and the form is simply left.
+    public function cancelDraft()
+    {
+        session()->flash('toast', 'The sale was cancelled. Nothing was saved.');
+
+        return $this->redirectRoute('sales.history');
     }
 
     public function canOverride(): bool
@@ -610,14 +695,13 @@ class NewSale extends Component
     {
         $rates = [is_numeric($this->gstJewellery) ? (float) $this->gstJewellery : 0.0, is_numeric($this->gstHallmark) ? (float) $this->gstHallmark : 0.0];
         $lines = collect($this->cart)->map(fn ($c) => ['total' => (float) $c['price'], 'taxable' => (float) ($c['taxable'] ?? $c['price'] - ($c['huid'] ?? 0)), 'huid_charge' => (float) ($c['huid'] ?? 0), 'making' => (float) ($c['making'] ?? 0), 'making_net' => (float) ($c['making_net'] ?? 0)]);
-        $v = is_numeric($this->adjustValue) ? (float) $this->adjustValue : 0.0;
+        $v = is_numeric($this->finalValue) ? (float) $this->finalValue : 0.0;
 
-        return app(PricingService::class)->billTotals($lines, $this->getExtrasTotalProperty(), $this->adjustType, $v, $rates[0], $rates[1]) + ['rates' => $rates];
-    }
+        $pricing = app(PricingService::class);
+        // The making charge is bargained per piece, so the bill carries no adjustment of its own any more: only the discount at the end.
+        $bill = $pricing->billTotals($lines, $this->getExtrasTotalProperty(), 'flat', 0.0, $rates[0], $rates[1]);
 
-    public function getAdjustmentProperty(): float
-    {
-        return $this->totals()['adjustment'];
+        return $pricing->withFinalDiscount($bill, $this->finalType, $v, $rates[0]) + ['rates' => $rates];
     }
 
     public function gstDetail(): array
@@ -630,7 +714,7 @@ class NewSale extends Component
         return $this->totals()['gst'];
     }
 
-    // The bill including GST, extra charges and round-off, less the adjustment: this is what is paid and kept as the sale's total.
+    // The bill including GST, extra charges and round-off, less the discount at the end: this is what is paid and kept as the sale's total.
     public function getTotalProperty(): float
     {
         return $this->totals()['total'];
@@ -681,20 +765,26 @@ class NewSale extends Component
 
         try {
         $sale = DB::transaction(function () use ($items, $pricing, $extras) {
-            $breakdowns = $items->mapWithKeys(fn ($i) => [$i->id => $pricing->breakdown($i)]);
-            $prices = $breakdowns->map(fn ($b) => $b['total']);
-            $subtotal = round($prices->sum(), 2);
-            $extrasTotal = round(array_sum(array_column($extras, 'amount')), 2);
-            $v = is_numeric($this->adjustValue) ? (float) $this->adjustValue : 0.0;
+            // Each piece is priced again here from the piece and what was changed on the bill, never from the cart's own figures.
+            $breakdowns = $items->mapWithKeys(function ($i) use ($pricing) {
+                $c = $this->cart[$i->id] ?? [];
+                $set = is_array($c['making_set'] ?? null) ? $c['making_set'] : [];
+                $w = trim((string) ($c['weight_input'] ?? ''));
 
-            // GST at the rates chosen on the bill, kept with the sale so a later change never alters it.
+                return [$i->id => $pricing->breakdown($i, [
+                    'weight' => is_numeric($w) && (float) $w > 0 ? (float) $w : null,
+                    'making_rate' => $set['rate'] ?? null,
+                    'making_amount' => $set['amount'] ?? null,
+                ])];
+            });
+            $prices = $breakdowns->map(fn ($b) => $b['total']);
+            $extrasTotal = round(array_sum(array_column($extras, 'amount')), 2);
+            $v = is_numeric($this->finalValue) ? (float) $this->finalValue : 0.0;
+
+            // GST at the owner's rates, kept with the sale so a later change never alters it.
             $rates = [(float) $this->gstJewellery, (float) $this->gstHallmark];
-            $bill = $pricing->billTotals($breakdowns, $extrasTotal, $this->adjustType, $v, $rates[0], $rates[1]);
+            $bill = $pricing->withFinalDiscount($pricing->billTotals($breakdowns, $extrasTotal, 'flat', 0.0, $rates[0], $rates[1]), $this->finalType, $v, $rates[0]);
             $gst = $bill;
-            $adjustment = $bill['adjustment'];
-            // "Final price" is kept as the discount it comes to, so the record reads the same as a flat one.
-            $storedType = $this->adjustType === 'final' ? 'flat' : $this->adjustType;
-            $storedValue = $this->adjustType === 'final' ? $adjustment : $v;
 
             $sale = Sale::create([
                 'customer_id' => $this->customerId,
@@ -702,9 +792,8 @@ class NewSale extends Component
                 'invoice_number' => 'RESV-' . now()->format('YmdHis') . '-' . $this->customerId, // the Tally bill number replaces it at verification
                 'type' => 'sale',
                 'additional_charges' => $extras ?: null,
-                'discount' => $adjustment,
-                'adjustment_type' => $adjustment > 0 ? $storedType : null,
-                'adjustment_value' => $adjustment > 0 ? $storedValue : null,
+                'discount' => 0, // the making charge is bargained per piece now; older sales keep their bill-level adjustment here
+                'final_discount' => $bill['final_discount'],
                 'accountant_note' => trim($this->notes) ?: null,
                 'order_override_note' => collect($this->cart)->contains(fn ($c) => $c['order'] !== null) ? trim($this->overrideNote) : null,
                 'gst_jewellery_percent' => $rates[0],
@@ -718,7 +807,18 @@ class NewSale extends Component
             ]);
 
             foreach ($items as $item) {
-                $sale->items()->attach($item->id, ['price_at_sale' => $prices[$item->id]]);
+                $b = $breakdowns[$item->id];
+                $c = $this->cart[$item->id] ?? [];
+                $sale->items()->attach($item->id, [
+                    'price_at_sale' => $prices[$item->id],
+                    'weight_listed' => $b['weight_listed'],
+                    'weight_at_sale' => $b['weight'],
+                    'weight_note' => abs($b['weight'] - $b['weight_listed']) > 0.0004 ? (trim((string) ($c['weight_note'] ?? '')) ?: null) : null,
+                    'making_kind' => $b['making_default_rate'] > 0 ? $b['making_kind'] : null,
+                    'making_default_rate' => $b['making_default_rate'] > 0 ? $b['making_default_rate'] : null,
+                    'making_rate' => $b['making_default_rate'] > 0 ? $b['making_rate'] : null,
+                    'making_amount' => $b['making'],
+                ]);
                 $item->update(['status' => 'reserved']); // per item, so each piece's history shows it
             }
 
@@ -787,6 +887,7 @@ class NewSale extends Component
                 ? app(ExchangeCredit::class)->available($this->customerId)
                     ->reject(fn ($x) => collect($this->payments)->contains(fn ($p) => ($p['exchange_id'] ?? null) === $x->id))->values()
                 : collect(),
+            'chargeNames' => $this->step === 3 ? \App\Support\ChargeNames::list() : [],
             'canOverride' => $this->canOverride(),
             'hasOrderWarning' => collect($this->cart)->contains(fn ($c) => $c['order'] !== null),
         ])->layout('components.layouts.app', ['title' => 'New Sale — Radharani Jewellery']);

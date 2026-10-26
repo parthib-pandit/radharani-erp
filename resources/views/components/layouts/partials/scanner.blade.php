@@ -1,113 +1,154 @@
 {{--
-    Camera scanner for phones: the shop has no handheld scanners, so every code field can open this.
+    Camera scanner for phones: the shop has no handheld scanners, so every code field can open this. It opens full screen,
+    like a payment app's scanner: the camera behind, close and torch on top, a Search pill at the bottom for typing a
+    HUID, code or name instead (the result is handed over like a scan), and when it keeps scanning a count with Done.
     Open it from anywhere with <x-ui.scan-button> or:
         $dispatch('rj-scan', { target: '#input-id', submit: 'enter' | 'form' | false, continuous: true, title: '...' })
         $dispatch('rj-scan', { mode: 'go' })   // top bar: open whatever was scanned
     A read fills the target input as if it had been typed. submit 'enter' then presses Enter on it,
     'form' submits its form; continuous keeps the camera open for the next tag.
 --}}
-<div x-data="rjScanner()" x-on:rj-scan.window="openWith($event.detail)" x-on:keydown.escape.window="open && close()"
-     x-show="open" x-cloak class="fixed inset-0 z-toast" role="dialog" aria-modal="true" aria-label="Camera scanner">
-    <div class="absolute inset-0 bg-[#0B0A08]/90 backdrop-blur-sm" x-show="open" x-transition.opacity x-on:click="close()"></div>
+<div x-data="rjScanner()" x-on:rj-scan.window="openWith($event.detail)" x-on:keydown.escape.window="searching ? closeSearch() : (open && close())"
+     x-show="open" x-cloak class="fixed inset-0 z-toast bg-black text-white overflow-hidden" role="dialog" aria-modal="true" aria-label="Camera scanner"
+     x-transition:enter="transition ease-silk duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100">
 
-    <div class="relative h-full w-full sm:h-auto sm:max-w-[520px] sm:mx-auto sm:mt-[6vh] sm:rounded-[18px] overflow-hidden bg-ink ink-grain text-white shadow-modal flex flex-col"
-         x-show="open" x-transition:enter="transition ease-silk duration-300" x-transition:enter-start="opacity-0 translate-y-4" x-transition:enter-end="opacity-100 translate-y-0">
-        <div class="h-[3px] gold-sheen shrink-0"></div>
+    {{-- The camera fills the whole screen --}}
+    <div x-ref="viewport" class="absolute inset-0 flex items-center justify-center overflow-hidden bg-black">
+        <div id="rj-scan-region" class="w-full origin-center transition-transform duration-200"></div>
+    </div>
 
-        {{-- Header --}}
-        <div class="flex items-center gap-3 px-4 sm:px-5 h-16 shrink-0">
-            <x-ui.logo :size="32" class="w-8 h-8" />
-            <div class="flex-1 min-w-0">
-                <div class="font-display text-[21px] leading-tight font-semibold text-gold-light truncate" x-text="title"></div>
-                <div class="text-[12px] text-ink-dim" x-text="continuous ? 'Keeps scanning. Tap Done when finished.' : 'Point the camera at the QR sticker or barcode.'"></div>
-            </div>
-            <button type="button" x-on:click="close()" aria-label="Close scanner"
-                class="press w-10 h-10 rounded-xl text-ink-fg hover:text-white hover:bg-white/10 flex items-center justify-center">
-                <x-ui.icon name="x" :size="20" />
+    {{-- Aiming frame --}}
+    <div x-show="status === 'scanning'" class="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div class="relative w-[78%] max-w-[360px] aspect-[3/2] rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,.45)]">
+            <span class="absolute -left-0.5 -top-0.5 w-9 h-9 border-l-[3px] border-t-[3px] border-gold-light rounded-tl-2xl"></span>
+            <span class="absolute -right-0.5 -top-0.5 w-9 h-9 border-r-[3px] border-t-[3px] border-gold-light rounded-tr-2xl"></span>
+            <span class="absolute -left-0.5 -bottom-0.5 w-9 h-9 border-l-[3px] border-b-[3px] border-gold-light rounded-bl-2xl"></span>
+            <span class="absolute -right-0.5 -bottom-0.5 w-9 h-9 border-r-[3px] border-b-[3px] border-gold-light rounded-br-2xl"></span>
+            <span class="rj-scanline absolute left-4 right-4 h-[2px] rounded-full bg-gold-light shadow-[0_0_12px_rgba(212,175,90,.9)]"></span>
+        </div>
+    </div>
+
+    {{-- Read flash --}}
+    <div x-show="flash" x-transition.opacity.duration.150ms class="absolute inset-0 bg-gold-light/25 pointer-events-none"></div>
+    <div x-show="flash && lastCode" x-transition class="absolute left-1/2 -translate-x-1/2 top-[22%] px-4 h-10 rounded-full bg-white text-ink shadow-pop flex items-center gap-2 text-[13px] font-semibold">
+        <x-ui.icon name="check-circle" :size="16" class="text-success" /> <span class="font-mono tracking-wide" x-text="lastCode"></span>
+    </div>
+
+    {{-- Starting --}}
+    <div x-show="status === 'starting'" class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-ink-fg">
+        <x-ui.icon name="loader" :size="26" class="animate-spin text-gold-light" />
+        <span class="text-[13px]">Starting the camera</span>
+    </div>
+
+    {{-- Error --}}
+    <div x-show="status === 'error'" class="absolute inset-0 flex flex-col items-center justify-center text-center gap-3 px-8">
+        <span class="w-14 h-14 rounded-2xl bg-white/5 ring-1 ring-white/10 text-gold-light flex items-center justify-center"><x-ui.icon name="camera" :size="24" /></span>
+        <p class="text-[14px] font-semibold text-white">Camera not available</p>
+        <p class="text-[13px] text-ink-fg max-w-[34ch]" x-text="error"></p>
+        <div class="flex gap-2 mt-1">
+            <button type="button" x-on:click="restart()" class="press h-10 px-4 rounded-lg text-[13px] font-semibold ring-1 ring-white/15 hover:bg-white/10">Try again</button>
+            <button type="button" x-on:click="openSearch()" class="press h-10 px-4 rounded-lg text-[13px] font-semibold gold-sheen text-ink">Search instead</button>
+        </div>
+    </div>
+
+    {{-- Top bar: close on the left, the torch and camera on the right --}}
+    <div class="absolute top-0 inset-x-0 z-10 flex items-center gap-3 px-3 pt-[max(.75rem,env(safe-area-inset-top))] pb-8 bg-gradient-to-b from-black/75 to-transparent pointer-events-none">
+        <button type="button" x-on:click="close()" aria-label="Close scanner"
+            class="press pointer-events-auto w-11 h-11 rounded-full bg-black/40 backdrop-blur ring-1 ring-white/15 text-white flex items-center justify-center shrink-0">
+            <x-ui.icon name="x" :size="20" />
+        </button>
+        <div class="flex-1 min-w-0 text-center">
+            <div class="font-display text-[20px] leading-tight font-semibold text-gold-light truncate" x-text="title"></div>
+            <div class="text-[12px] text-white/70" x-text="continuous ? 'Keeps scanning. Tap Done when finished.' : 'Point the camera at the QR sticker or barcode.'"></div>
+        </div>
+        <div class="flex gap-2 shrink-0 min-w-[44px] justify-end pointer-events-auto">
+            <button type="button" x-show="torchSupported && status === 'scanning'" x-on:click="toggleTorch()" aria-label="Torch"
+                :class="torchOn ? 'bg-gold-light text-ink' : 'bg-black/40 text-white'"
+                class="press w-11 h-11 rounded-full backdrop-blur flex items-center justify-center ring-1 ring-white/15">
+                <x-ui.icon name="flashlight" :size="18" />
+            </button>
+            <button type="button" x-show="cameras.length > 1 && status === 'scanning'" x-on:click="switchCamera()" aria-label="Switch camera"
+                class="press w-11 h-11 rounded-full bg-black/40 text-white backdrop-blur flex items-center justify-center ring-1 ring-white/15">
+                <x-ui.icon name="switch-camera" :size="18" />
             </button>
         </div>
+    </div>
 
-        {{-- Camera --}}
-        <div class="relative flex-1 sm:flex-none sm:aspect-[4/3] bg-black overflow-hidden">
-            <div x-ref="viewport" class="absolute inset-0 flex items-center justify-center overflow-hidden">
-                <div id="rj-scan-region" class="w-full origin-center transition-transform duration-200"></div>
-            </div>
-
-            {{-- Aiming frame --}}
-            <div x-show="status === 'scanning'" class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div class="relative w-[78%] max-w-[340px] aspect-[3/2] rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,.38)]">
-                    <span class="absolute -left-0.5 -top-0.5 w-9 h-9 border-l-[3px] border-t-[3px] border-gold-light rounded-tl-2xl"></span>
-                    <span class="absolute -right-0.5 -top-0.5 w-9 h-9 border-r-[3px] border-t-[3px] border-gold-light rounded-tr-2xl"></span>
-                    <span class="absolute -left-0.5 -bottom-0.5 w-9 h-9 border-l-[3px] border-b-[3px] border-gold-light rounded-bl-2xl"></span>
-                    <span class="absolute -right-0.5 -bottom-0.5 w-9 h-9 border-r-[3px] border-b-[3px] border-gold-light rounded-br-2xl"></span>
-                    <span class="rj-scanline absolute left-4 right-4 h-[2px] rounded-full bg-gold-light shadow-[0_0_12px_rgba(212,175,90,.9)]"></span>
-                </div>
-            </div>
-
-            {{-- Read flash --}}
-            <div x-show="flash" x-transition.opacity.duration.150ms class="absolute inset-0 bg-gold-light/25 pointer-events-none"></div>
-            <div x-show="flash && lastCode" x-transition class="absolute left-1/2 -translate-x-1/2 bottom-5 px-4 h-10 rounded-full bg-white text-ink shadow-pop flex items-center gap-2 text-[13px] font-semibold">
-                <x-ui.icon name="check-circle" :size="16" class="text-success" /> <span class="font-mono tracking-wide" x-text="lastCode"></span>
-            </div>
-
-            {{-- Starting --}}
-            <div x-show="status === 'starting'" class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-ink-fg">
-                <x-ui.icon name="loader" :size="26" class="animate-spin text-gold-light" />
-                <span class="text-[13px]">Starting the camera</span>
-            </div>
-
-            {{-- Error --}}
-            <div x-show="status === 'error'" class="absolute inset-0 flex flex-col items-center justify-center text-center gap-3 px-8">
-                <span class="w-14 h-14 rounded-2xl bg-white/5 ring-1 ring-white/10 text-gold-light flex items-center justify-center"><x-ui.icon name="camera" :size="24" /></span>
-                <p class="text-[14px] font-semibold text-white">Camera not available</p>
-                <p class="text-[13px] text-ink-fg max-w-[34ch]" x-text="error"></p>
-                <button type="button" x-on:click="restart()" class="press mt-1 h-9 px-4 rounded-lg text-[13px] font-semibold ring-1 ring-white/15 hover:bg-white/10">Try again</button>
-            </div>
-
-            {{-- Camera controls --}}
-            <div x-show="status === 'scanning'" class="absolute top-3 right-3 flex flex-col gap-2">
-                <button type="button" x-show="torchSupported" x-on:click="toggleTorch()" aria-label="Torch"
-                    :class="torchOn ? 'bg-gold-light text-ink' : 'bg-black/45 text-white'"
-                    class="press w-11 h-11 rounded-full backdrop-blur flex items-center justify-center ring-1 ring-white/15">
-                    <x-ui.icon name="flashlight" :size="18" />
-                </button>
-                <button type="button" x-show="cameras.length > 1" x-on:click="switchCamera()" aria-label="Switch camera"
-                    class="press w-11 h-11 rounded-full bg-black/45 text-white backdrop-blur flex items-center justify-center ring-1 ring-white/15">
-                    <x-ui.icon name="switch-camera" :size="18" />
-                </button>
-            </div>
-        </div>
-
-        {{-- Bottom sheet --}}
-        <div class="shrink-0 px-4 sm:px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] space-y-3.5">
+    {{-- Bottom: the count and Done when it keeps scanning, and the Search pill --}}
+    <div class="absolute bottom-0 inset-x-0 z-10 px-4 pt-14 pb-[max(1.25rem,env(safe-area-inset-bottom))] bg-gradient-to-t from-black/85 via-black/55 to-transparent">
+        <div class="max-w-[520px] mx-auto space-y-3.5">
             <template x-if="continuous && results.length">
-                <div>
-                    <div class="flex items-baseline justify-between mb-2">
-                        <span class="text-[12.5px] font-semibold text-ink-fg">Scanned this time</span>
-                        <span class="font-display text-[24px] leading-none font-semibold text-gold-light tabular" x-text="results.length"></span>
-                    </div>
-                    <div class="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
-                        <template x-for="r in results" :key="r.at + r.code">
-                            <span class="shrink-0 h-8 px-3 rounded-lg bg-white/[.07] ring-1 ring-white/10 text-[12.5px] font-mono tracking-wide flex items-center" x-text="r.code"></span>
-                        </template>
-                    </div>
+                <div class="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none]">
+                    <template x-for="r in results" :key="r.at + r.code">
+                        <span class="shrink-0 h-8 px-3 rounded-lg bg-white/[.12] ring-1 ring-white/15 text-[12.5px] font-mono tracking-wide flex items-center" x-text="r.code"></span>
+                    </template>
                 </div>
             </template>
 
-            <form x-on:submit.prevent="submitManual()" class="flex gap-2">
-                <div class="relative flex-1">
-                    <x-ui.icon name="keyboard" :size="16" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-dim pointer-events-none" />
-                    <input type="text" x-model="manual" autocomplete="off" autocapitalize="characters" placeholder="Or type the code"
-                        class="w-full h-11 pl-10 pr-3 rounded-xl bg-white/[.06] border border-white/10 text-white text-[14px] font-mono tracking-wide placeholder:text-white/35 placeholder:font-sans placeholder:tracking-normal
+            <div class="flex items-center gap-3" x-show="continuous">
+                <div class="flex items-baseline gap-2 flex-1 min-w-0">
+                    <span class="font-display text-[34px] leading-none font-semibold text-gold-light tabular" x-text="results.length"></span>
+                    <span class="text-[13px] text-white/75">scanned</span>
+                </div>
+                <button type="button" x-on:click="close()"
+                    class="press h-12 px-7 rounded-xl gold-sheen text-ink text-[14.5px] font-bold shadow-gold inline-flex items-center justify-center gap-2">
+                    <x-ui.icon name="check" :size="17" /> Done
+                </button>
+            </div>
+
+            <div class="flex justify-center">
+                <button type="button" x-on:click="openSearch()"
+                    class="press h-12 px-6 rounded-full bg-white/[.14] backdrop-blur ring-1 ring-white/25 text-white text-[14px] font-semibold inline-flex items-center gap-2.5 hover:bg-white/20">
+                    <x-ui.icon name="search" :size="18" /> Search by HUID, code or name
+                </button>
+            </div>
+        </div>
+    </div>
+
+    {{-- Search: slides up over the camera. A pick is handed over exactly like a scan. --}}
+    <div x-show="searching" x-cloak class="absolute inset-0 z-20 flex flex-col justify-end" x-transition.opacity>
+        <div class="absolute inset-0 bg-black/60" x-on:click="closeSearch()"></div>
+        <div class="relative w-full max-w-[560px] mx-auto bg-ink ink-grain rounded-t-[22px] shadow-modal flex flex-col max-h-[88%] pb-[max(1rem,env(safe-area-inset-bottom))]"
+             x-show="searching" x-transition:enter="transition ease-silk duration-250" x-transition:enter-start="translate-y-8 opacity-0" x-transition:enter-end="translate-y-0 opacity-100">
+            <div class="h-[3px] gold-sheen rounded-t-[22px] shrink-0"></div>
+            <div class="flex items-center gap-3 px-4 pt-4 pb-3 shrink-0">
+                <div class="flex-1 min-w-0">
+                    <div class="font-display text-[20px] leading-tight font-semibold text-gold-light">Search</div>
+                    <div class="text-[12px] text-white/60">Pieces, packets and boxes. Tap one to use it.</div>
+                </div>
+                <button type="button" x-on:click="closeSearch()" aria-label="Back to the camera" class="press w-10 h-10 rounded-xl text-white/80 hover:bg-white/10 flex items-center justify-center">
+                    <x-ui.icon name="x" :size="20" />
+                </button>
+            </div>
+            <form x-on:submit.prevent="submitSearch()" class="px-4 pb-3 shrink-0">
+                <div class="relative">
+                    <x-ui.icon name="search" :size="16" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/45 pointer-events-none" />
+                    <input type="text" x-ref="searchInput" x-model="query" x-on:input.debounce.250ms="runSearch()" autocomplete="off" autocapitalize="characters" enterkeyhint="search"
+                        placeholder="HUID, code, category, packet or box"
+                        class="w-full h-12 pl-10 pr-3 rounded-xl bg-white/[.08] border border-white/15 text-white text-[15px] placeholder:text-white/40
                                focus:outline-none focus:border-gold-light focus:ring-4 focus:ring-gold/20">
                 </div>
-                <button type="submit" class="press h-11 px-4 rounded-xl text-[13px] font-semibold ring-1 ring-white/15 hover:bg-white/10">Use</button>
             </form>
-
-            <button type="button" x-on:click="close()"
-                class="press w-full h-12 rounded-xl gold-sheen text-ink text-[14.5px] font-bold shadow-gold inline-flex items-center justify-center gap-2">
-                <x-ui.icon name="check" :size="17" /> <span x-text="continuous ? 'Done' : 'Close'"></span>
-            </button>
+            <div class="overflow-y-auto px-2 min-h-[80px]">
+                <button type="button" x-show="query.trim().length > 0" x-on:click="submitSearch()"
+                    class="w-full text-left px-3 py-3 rounded-xl hover:bg-white/10 flex items-center gap-3">
+                    <span class="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center shrink-0"><x-ui.icon name="keyboard" :size="16" class="text-white/70" /></span>
+                    <span class="min-w-0"><span class="block text-[12px] text-white/55">Use what you typed as the code</span><span class="block font-mono tracking-wide text-[14px] truncate" x-text="query.trim()"></span></span>
+                </button>
+                <template x-for="r in matches" :key="r.type + r.code">
+                    <button type="button" x-on:click="pick(r)" class="w-full text-left px-3 py-3 rounded-xl hover:bg-white/10 flex items-center gap-3">
+                        <span class="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center shrink-0 text-gold-light">
+                            <x-ui.icon name="gem" :size="16" x-show="r.type === 'item'" />
+                            <x-ui.icon name="package" :size="16" x-show="r.type === 'packet'" />
+                            <x-ui.icon name="archive" :size="16" x-show="r.type === 'box'" />
+                        </span>
+                        <span class="min-w-0 flex-1"><span class="block font-mono tracking-wide text-[14px] truncate" x-text="r.label"></span><span class="block text-[12.5px] text-white/60 truncate" x-text="r.detail"></span></span>
+                        <x-ui.icon name="plus" :size="16" class="text-white/45 shrink-0" />
+                    </button>
+                </template>
+                <p x-show="searched && !matches.length && !loading" class="px-3 py-6 text-center text-[13px] text-white/55">Nothing found. You can use what you typed as the code.</p>
+                <p x-show="loading" class="px-3 py-6 text-center text-[13px] text-white/55">Searching</p>
+            </div>
         </div>
     </div>
 </div>
@@ -132,7 +173,9 @@ document.addEventListener('alpine:init', () => {
         return {
             open: false, status: 'idle', error: '', title: 'Scan a code',
             target: null, submit: false, continuous: false, mode: 'fill',
-            results: [], manual: '', flash: false, lastCode: '',
+            results: [], flash: false, lastCode: '',
+            // The typed search that sits over the camera.
+            searching: false, query: '', matches: [], searched: false, loading: false, searchSeq: 0,
             torchSupported: false, torchOn: false, cameras: [], camIndex: -1,
 
             openWith(detail) {
@@ -142,7 +185,8 @@ document.addEventListener('alpine:init', () => {
                 this.submit = d.submit || false;
                 this.continuous = !!d.continuous;
                 this.mode = d.mode || 'fill';
-                this.results = []; this.manual = ''; this.lastCode = '';
+                this.results = []; this.lastCode = '';
+                this.searching = false; this.query = ''; this.matches = []; this.searched = false;
                 last = { code: null, at: 0 };
                 // Created inside the tap so mobile browsers allow the beep.
                 try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); } catch (e) {}
@@ -202,21 +246,23 @@ document.addEventListener('alpine:init', () => {
                 this.status = 'error';
                 this.error = {
                     insecure: 'The camera only works on a secure connection. Open the ERP with https:// and try again.',
-                    unsupported: 'This browser can not use the camera. Try Chrome or Safari, or type the code below.',
+                    unsupported: 'This browser can not use the camera. Try Chrome or Safari, or use Search.',
                     denied: 'Camera permission is blocked. Allow the camera for this site in the browser settings, then try again.',
-                    nocamera: 'No camera was found on this device. Type the code below instead.',
+                    nocamera: 'No camera was found on this device. Use Search instead.',
                     other: 'The camera could not start. Close any other app using it and try again.',
                 }[kind];
             },
 
-            found(text) {
+            // fromSearch: a pick the person made on purpose, so it counts even if the camera just read the same code.
+            found(text, fromSearch = false) {
+                if (this.searching && !fromSearch) return; // the camera keeps running under the search: ignore what it sees meanwhile
                 let code = String(text || '').trim();
                 // A QR sticker holds a link (…/stock/q/CODE). A field wants the code in it, except the top-bar scan, which opens the link.
                 if (this.mode !== 'go') code = code.replace(/^.*\/q\/([A-Za-z0-9]+)\/?$/, '$1');
                 if (!code) return;
                 const now = Date.now();
                 // The camera reads the same tag many times a second; count it once.
-                if (code === last.code && now - last.at < 2500) return;
+                if (!fromSearch && code === last.code && now - last.at < 2500) return;
                 last = { code, at: now };
                 this.feedback(code);
                 this.deliver(code);
@@ -228,12 +274,43 @@ document.addEventListener('alpine:init', () => {
                 }
             },
 
-            submitManual() {
-                const code = this.manual.trim();
-                if (!code) return;
-                this.manual = '';
-                last = { code: null, at: 0 };
-                this.found(code);
+            openSearch() {
+                this.searching = true; this.query = ''; this.matches = []; this.searched = false;
+                this.$nextTick(() => this.$refs.searchInput && this.$refs.searchInput.focus());
+            },
+
+            closeSearch() { this.searching = false; },
+
+            // Typing waits a moment, then asks the server. An answer that is no longer the latest question is dropped.
+            async runSearch() {
+                const q = this.query.trim();
+                const seq = ++this.searchSeq;
+                if (q.length < 2) { this.matches = []; this.searched = false; this.loading = false; return; }
+                this.loading = true;
+                try {
+                    const r = await fetch(@js(route('stock.scan.search')) + '?q=' + encodeURIComponent(q), { headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' });
+                    const data = r.ok ? await r.json() : { results: [] };
+                    if (seq !== this.searchSeq) return;
+                    this.matches = data.results || [];
+                } catch (e) {
+                    if (seq !== this.searchSeq) return;
+                    this.matches = [];
+                }
+                this.searched = true; this.loading = false;
+            },
+
+            // Pressing Enter: the only match, or else what was typed, taken as the code (like typing it into the field).
+            submitSearch() {
+                const q = this.query.trim();
+                if (!q) return;
+                const exact = this.matches.find(r => r.code.toLowerCase() === q.toLowerCase());
+                this.pick(exact || { code: q });
+            },
+
+            pick(r) {
+                this.searching = false;
+                this.matches = []; this.query = '';
+                this.found(r.code, true); // the same hand-over as a scan
             },
 
             deliver(code) {

@@ -21,7 +21,7 @@ class Item extends Model
         'packet_id', 'metal', 'mrp', 'huid_code', 'internal_code', 'category', 'category_id', 'entry_batch_id', 'source_hallmark_batch_id', 'purity',
         'weight', 'description', 'hsn_code', 'making_type', 'making_value',
         'pair_group_id', 'source_karigar_batch_id', 'source_purchase_item_id',
-        'status', 'net_weight', 'stones', 'stone_value', 'diamond_carat', 'diamond_cut', 'diamond_summary_no',
+        'status', 'net_weight', 'stones', 'stone_value', 'default_additional_charges', 'diamond_carat', 'diamond_cut', 'diamond_summary_no',
         // website listing
         'show_on_website', 'web_name', 'slug', 'web_description', 'storefront_collection_id',
         'audiences', 'occasions', 'dimensions', 'size_type', 'size_label', 'is_bestseller', 'listed_at',
@@ -32,6 +32,7 @@ class Item extends Model
         'is_bestseller' => 'boolean',
         'audiences' => 'array',
         'occasions' => 'array',
+        'default_additional_charges' => 'array',
         'listed_at' => 'datetime',
     ];
 
@@ -70,12 +71,20 @@ class Item extends Model
             ->logOnly([
                 'packet_id', 'status', 'huid_code', 'metal', 'category', 'purity', 'weight',
                 'description', 'hsn_code', 'making_type', 'making_value', 'pair_group_id',
-                'net_weight', 'stones', 'stone_value', 'diamond_carat', 'diamond_cut', 'diamond_summary_no', 'show_on_website', 'web_name', 'slug',
+                'net_weight', 'stones', 'stone_value', 'default_additional_charges', 'diamond_carat', 'diamond_cut', 'diamond_summary_no', 'show_on_website', 'web_name', 'slug',
                 'storefront_collection_id', 'is_bestseller',
             ])
             ->logOnlyDirty()
             ->dontLogEmptyChanges()
             ->useLogName('stock');
+    }
+
+    /** The piece's default additional charges as clean pairs: [['name' => 'Sakha', 'amount' => 250.0], ...]. */
+    public function defaultCharges(): array
+    {
+        return collect($this->default_additional_charges ?? [])
+            ->filter(fn ($c) => ($c['name'] ?? '') !== '' && is_numeric($c['amount'] ?? null) && (float) $c['amount'] > 0)
+            ->map(fn ($c) => ['name' => (string) $c['name'], 'amount' => round((float) $c['amount'], 2)])->values()->all();
     }
 
     // The code staff actually read off the tag: HUID when present, else the internal code.
@@ -93,7 +102,7 @@ class Item extends Model
             for ($i = 0; $i < 5; $i++) {
                 $code .= self::CODE_ALPHABET[random_int(0, strlen(self::CODE_ALPHABET) - 1)];
             }
-        } while (static::where('internal_code', $code)->exists());
+        } while (static::where('internal_code', $code)->exists() || ReservedCode::where('code', $code)->exists());
 
         return $code;
     }
@@ -183,7 +192,7 @@ class Item extends Model
 
     public function sales()
     {
-        return $this->belongsToMany(\App\Models\Sales\Sale::class, 'sale_items')->withPivot('price_at_sale');
+        return $this->belongsToMany(\App\Models\Sales\Sale::class, 'sale_items')->withPivot('price_at_sale', 'weight_listed', 'weight_at_sale', 'weight_note', 'making_kind', 'making_default_rate', 'making_rate', 'making_amount');
     }
 
     public function movements()

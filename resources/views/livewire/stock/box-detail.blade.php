@@ -76,6 +76,9 @@
                     </div>
                 </div>
                 <x-stock.status-mix :counts="$statusCounts" :total="$pieces" />
+                @if ($soldCount > 0)
+                    <p class="mt-3 text-[12px] text-ink_text-muted">{{ $soldCount }} sold {{ \Illuminate\Support\Str::plural('piece', $soldCount) }} left this box and {{ $soldCount === 1 ? 'is' : 'are' }} not counted.</p>
+                @endif
                 @if ($metalWeights->filter()->isNotEmpty())
                     <div class="mt-4 pt-4 border-t border-line-light flex flex-wrap gap-1.5">
                         @foreach ($metalWeights->filter() as $metal => $w)
@@ -84,6 +87,9 @@
                     </div>
                 @endif
                 <dl class="rj-dl mt-4 pt-4 border-t border-line-light">
+                    @if (\App\Models\Location::where('type', 'vault')->count() > 1)
+                        <div><dt>Kept in</dt><dd>{{ \App\Models\Location::find(\App\Models\Location::vaultOf('box', $box->id))?->name }}</dd></div>
+                    @endif
                     <div><dt>Created</dt><dd>{{ $box->created_at?->format('d M Y') }}</dd></div>
                     <div><dt>Last change</dt><dd>{{ $box->updated_at?->diffForHumans() }}</dd></div>
                 </dl>

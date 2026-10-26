@@ -121,10 +121,13 @@ class PacketDetail extends Component
     public function render(StockHistoryService $history)
     {
         $this->packet->load('box');
-        $items = $this->packet->items()->orderBy('category')->orderBy('id')->get();
+        $all = $this->packet->items()->orderBy('category')->orderBy('id')->get();
+        // Sold pieces stay linked to the packet for the history, but they are not in custody any more.
+        $items = $all->where('status', '!=', 'sold')->values();
 
         return view('livewire.stock.packet-detail', [
             'items' => $items,
+            'soldItems' => $all->where('status', 'sold')->values(),
             'statusCounts' => $items->countBy('status'),
             'metalWeights' => $items->groupBy('metal')->map->sum('weight'),
             'events' => $history->forPacket($this->packet),

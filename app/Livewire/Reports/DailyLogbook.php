@@ -42,7 +42,7 @@ class DailyLogbook extends Component
                 'paid' => null,
             ]);
 
-        $sales = Sale::with('customer')->withSum('payments', 'amount')->whereDate('created_at', '>=', $from)->whereDate('created_at', '<=', $to)->get()
+        $sales = Sale::notCancelled()->with('customer')->withSum('payments', 'amount')->whereDate('created_at', '>=', $from)->whereDate('created_at', '<=', $to)->get()
             ->map(fn ($s) => [
                 'time' => $s->created_at,
                 'kind' => 'sale',
@@ -99,7 +99,7 @@ class DailyLogbook extends Component
             'stats' => [
                 'movements' => $all->where('kind', 'movement')->count(),
                 'sales' => $all->where('kind', 'sale')->count(),
-                'salesValue' => Sale::whereDate('created_at', $this->date)->sum('total'),
+                'salesValue' => Sale::notCancelled()->whereDate('created_at', $this->date)->sum('total'),
             ],
         ])->layout('components.layouts.app', ['title' => 'Daily Logbook — Radharani Jewellery ERP']);
     }

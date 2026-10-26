@@ -103,15 +103,18 @@ class BoxDetail extends Component
     public function render(StockHistoryService $history)
     {
         $packets = $this->box->packets()
-            ->withCount('items')
-            ->withSum('items', 'weight')
+            ->withCount('custodyItems as items_count')
+            ->withSum('custodyItems as items_sum_weight', 'weight')
             ->orderBy('code')
             ->get();
 
-        $items = Item::whereIn('packet_id', $packets->pluck('id'));
+        // What is in custody: sold pieces stay linked to their packet for the history but are not counted.
+        $inside = Item::whereIn('packet_id', $packets->pluck('id'));
+        $items = (clone $inside)->where('status', '!=', 'sold');
 
         return view('livewire.stock.box-detail', [
             'packets' => $packets,
+            'soldCount' => (clone $inside)->where('status', 'sold')->count(),
             'pieces' => (clone $items)->count(),
             'weight' => (float) (clone $items)->sum('weight'),
             'statusCounts' => (clone $items)->selectRaw('status, count(*) as c')->groupBy('status')->pluck('c', 'status'),
@@ -119,7 +122,7 @@ class BoxDetail extends Component
             'events' => $history->forBox($this->box),
             'qr' => $this->box->qrCodes()->latest('id')->first(),
             'candidatePackets' => $this->showAdd && $this->addMode === 'existing'
-                ? Packet::with('box:id,code')->withCount('items')
+                ? Packet::with('box:id,code')->withCount('custodyItems as items_count')
                     ->where(fn ($q) => $q->whereNull('box_id')->orWhere('box_id', '!=', $this->box->id))
                     ->when($this->packetSearch, fn ($q) => $q->where(fn ($q) => $q
                         ->where('code', 'like', "%{$this->packetSearch}%")->orWhere('label', 'like', "%{$this->packetSearch}%")))

@@ -28,6 +28,11 @@ class BulkImport extends Component
         'hsn_code' => ['HSN code', false, ['hsn']],
         'making_type' => ['Making type', false, ['making type', 'making_type', 'mc type']],
         'making_value' => ['Making value', false, ['making', 'making value', 'making charge', 'mc', 'labour', 'wastage']],
+        // Up to two additional charges a piece carries by default (25 Oct), each a name and an amount.
+        'charge1_name' => ['Additional charge 1', false, ['additional charge 1', 'additional 1', 'extra charge 1', 'charge 1', 'additional charge']],
+        'charge1_amount' => ['Additional amount 1', false, ['additional amount 1', 'additional price 1', 'charge amount 1', 'charge 1 amount', 'additional amount']],
+        'charge2_name' => ['Additional charge 2', false, ['additional charge 2', 'additional 2', 'extra charge 2', 'charge 2']],
+        'charge2_amount' => ['Additional amount 2', false, ['additional amount 2', 'additional price 2', 'charge amount 2', 'charge 2 amount']],
     ];
 
     public int $step = 1;
@@ -47,6 +52,8 @@ class BulkImport extends Component
     public string $defaultCategory = '';
     public string $defaultPurity = '';
     public int $templateCount = 10;
+    // The blank sheet comes with the HUID column already filled with internal codes (reserved when it is downloaded).
+    public bool $withCodes = true;
 
     // Step 3
     public array $reviewRows = [];
@@ -105,25 +112,27 @@ class BulkImport extends Component
     public function downloadBlankTemplate()
     {
         $n = max(1, min(500, $this->templateCount));
+        // Reserved now, before the file is sent, so two sheets can never share a code.
+        $codes = $this->withCodes ? \App\Models\Stock\ReservedCode::reserve($n) : collect();
 
-        return response()->streamDownload(function () use ($n) {
+        return response()->streamDownload(function () use ($n, $codes) {
             $out = fopen('php://output', 'w');
             fputcsv($out, ['S No.', 'Item Category', 'No Of Unit', 'HUID', 'Weight of Article (Gms)', 'Purity']);
             for ($i = 1; $i <= $n; $i++) {
-                fputcsv($out, [$i, 'Mix Ornaments', 1, '', '', '']);
+                fputcsv($out, [$i, 'Mix Ornaments', 1, $codes[$i - 1] ?? '', '', '']);
             }
             fclose($out);
-        }, "huid-import-{$n}-rows.csv", ['Content-Type' => 'text/csv']);
+        }, ($codes->isNotEmpty() ? "import-with-codes-{$n}-rows.csv" : "huid-import-{$n}-rows.csv"), ['Content-Type' => 'text/csv']);
     }
 
     public function downloadTemplate()
     {
         return response()->streamDownload(function () {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['HUID', 'Category', 'Metal', 'Purity', 'Weight', 'Description', 'HSN', 'Making type', 'Making value']);
-            fputcsv($out, ['', 'Ring', 'gold', '22K', '4.250', 'Floral band', '7113', 'per piece', '650']);
-            fputcsv($out, ['A7K812', 'Necklace', 'gold', '22K', '28.600', 'Temple design', '7113', 'percentage', '14']);
-            fputcsv($out, ['', 'Anklet', 'silver', '92.5', '31.400', 'Pair, left', '7113', 'per gram', '9']);
+            fputcsv($out, ['HUID', 'Category', 'Metal', 'Purity', 'Weight', 'Description', 'HSN', 'Making type', 'Making value', 'Additional charge 1', 'Additional amount 1', 'Additional charge 2', 'Additional amount 2']);
+            fputcsv($out, ['', 'Ring', 'gold', '22K', '4.250', 'Floral band', '7113', 'per piece', '650', '', '', '', '']);
+            fputcsv($out, ['A7K812', 'Necklace', 'gold', '22K', '28.600', 'Temple design', '7113', 'percentage', '14', 'Sakha', '250', '', '']);
+            fputcsv($out, ['', 'Anklet', 'silver', '92.5', '31.400', 'Pair, left', '7113', 'per gram', '9', 'Polish', '100', 'Packing', '50']);
             fclose($out);
         }, 'stock-import-template.csv', ['Content-Type' => 'text/csv']);
     }
@@ -162,14 +171,25 @@ class BulkImport extends Component
     {
         $fieldIndex = array_flip(array_filter($this->mapping));
         $existingHuids = Item::whereNotNull('huid_code')->pluck('huid_code')->map(fn ($h) => strtoupper($h))->flip();
+        $reservedCodes = \App\Models\Stock\ReservedCode::pluck('used_item_id', 'code')->all(); // code => the piece that carries it, or null
         $seenHuids = [];
         $this->reviewRows = [];
 
         foreach ($this->rows as $n => $row) {
+            $chargeProblems = [];
             $get = fn ($field) => isset($fieldIndex[$field]) ? trim((string) ($row[$fieldIndex[$field]] ?? '')) : '';
 
+            // A code that came on a downloaded sheet is the piece's internal code, not a HUID.
+            $cell = strtoupper($get('huid_code'));
+            $isReserved = $cell !== '' && array_key_exists($cell, $reservedCodes);
+            // A row of a downloaded sheet left without a weight is a code nobody used: skipped, the code stays free.
+            if ($isReserved && $reservedCodes[$cell] === null && $get('weight') === '') {
+                continue;
+            }
+
             $data = [
-                'huid_code' => strtoupper($get('huid_code')) ?: null,
+                'huid_code' => $isReserved ? null : ($cell ?: null),
+                'internal_code' => $isReserved ? $cell : null,
                 'category' => ucwords(strtolower($get('category'))) ?: (trim($this->defaultCategory) !== '' ? trim($this->defaultCategory) : 'Uncategorised'),
                 'metal' => $this->parseMetal($get('metal')),
                 'purity' => $get('purity') !== '' ? $get('purity') : trim($this->defaultPurity),
@@ -178,9 +198,24 @@ class BulkImport extends Component
                 'hsn_code' => $get('hsn_code') ?: null,
                 'making_type' => $this->parseMakingType($get('making_type')),
                 'making_value' => $get('making_value') !== '' ? str_replace([',', '₹', '%', ' '], '', $get('making_value')) : $this->defaultMakingValue,
+                'charges' => [],
             ];
 
-            $errors = [];
+            // Additional charges: a name and an amount together, or neither.
+            foreach ([1, 2] as $k) {
+                $cName = mb_substr($get("charge{$k}_name"), 0, 60);
+                $cAmount = str_replace([',', '₹', ' '], '', $get("charge{$k}_amount"));
+                if ($cName === '' && $cAmount === '') {
+                    continue;
+                }
+                if ($cName === '' || ! is_numeric($cAmount) || (float) $cAmount <= 0) {
+                    $chargeProblems[] = "Additional charge {$k} needs a name and an amount";
+                    continue;
+                }
+                $data['charges'][] = ['name' => $cName, 'amount' => round((float) $cAmount, 2)];
+            }
+
+            $errors = $chargeProblems;
             if (! is_numeric($data['weight']) || (float) $data['weight'] <= 0) $errors[] = 'Weight is not a number';
             if (! $data['metal']) $errors[] = 'Unknown metal "' . $get('metal') . '"';
             if (! $data['making_type']) $errors[] = 'Unknown making type "' . $get('making_type') . '"';
@@ -194,7 +229,12 @@ class BulkImport extends Component
             }
 
             $duplicate = null;
-            if ($data['huid_code']) {
+            if ($data['internal_code']) {
+                if ($reservedCodes[$data['internal_code']] !== null || isset($seenHuids['code:' . $data['internal_code']])) {
+                    $duplicate = $reservedCodes[$data['internal_code']] !== null ? 'Code already on a piece' : 'Same code as row ' . $seenHuids['code:' . $data['internal_code']];
+                }
+                $seenHuids['code:' . $data['internal_code']] ??= $n + 2;
+            } elseif ($data['huid_code']) {
                 if (isset($existingHuids[$data['huid_code']])) {
                     $duplicate = 'HUID already in stock';
                 } elseif (isset($seenHuids[$data['huid_code']])) {
@@ -288,8 +328,8 @@ class BulkImport extends Component
                 $d = $row['data'];
                 $item = Item::create([
                     'huid_code' => $d['huid_code'],
-                    // No HUID -> the curated non-ambiguous internal code (never a second generator).
-                    'internal_code' => $d['huid_code'] ? null : Item::generateInternalCode(),
+                    // A code reserved on the downloaded sheet, else no HUID -> the curated non-ambiguous internal code (never a second generator).
+                    'internal_code' => $d['internal_code'] ?: ($d['huid_code'] ? null : Item::generateInternalCode()),
                     'metal' => $d['metal'],
                     'category' => $d['category'],
                     // Matched to the owner's category tree; a new name is added under that metal for the owner to tidy.
@@ -300,11 +340,15 @@ class BulkImport extends Component
                     'hsn_code' => $d['hsn_code'],
                     'making_type' => $d['making_type'],
                     'making_value' => (float) $d['making_value'],
+                    'default_additional_charges' => $d['charges'] ?: null,
                     // Every import lands unassigned (no packet, so on hold) until someone puts it in a packet.
                     'packet_id' => null,
                     'status' => 'on_hold',
                     'entry_batch_id' => $batch->id,
                 ]);
+                if ($d['internal_code']) {
+                    \App\Models\Stock\ReservedCode::claim($d['internal_code'], $item);
+                }
                 $ids[] = $item->id;
             }
 

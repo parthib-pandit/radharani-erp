@@ -27,7 +27,7 @@ class StaffActivityReport extends Component
             ->groupBy('user_id')
             ->pluck('total', 'user_id');
 
-        $saleCounts = Sale::selectRaw('created_by, count(*) as total, sum(total) as amount')
+        $saleCounts = Sale::notCancelled()->selectRaw('created_by, count(*) as total, sum(total) as amount')
             ->whereDate('created_at', '>=', $this->fromDate)
             ->whereDate('created_at', '<=', $this->toDate)
             ->when($this->staffId, fn ($q) => $q->where('created_by', $this->staffId))
