@@ -5,7 +5,7 @@ $user = auth()->user();
 
 // Live counts for queues that need someone's attention.
 $pendingReview = \App\Models\Stock\Item::where('status', 'pending_review')->count();
-$pendingSales = \App\Models\Sales\Sale::where('confirmed_by_accountant', false)->count();
+$pendingSales = \App\Models\Sales\Sale::notCancelled()->where('confirmed_by_accountant', false)->count();
 $pendingMessages = \App\Models\Notification\PendingNotification::where('status', 'pending')->count();
 
 // Single source for the whole navigation. 'can' is a permission (or list, any-of) gate.

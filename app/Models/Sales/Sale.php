@@ -44,6 +44,22 @@ class Sale extends Model
         return $this->hasMany(SalePayment::class);
     }
 
+    public function cancellation()
+    {
+        return $this->hasOne(SaleCancellation::class);
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->relationLoaded('cancellation') ? $this->cancellation !== null : $this->cancellation()->exists();
+    }
+
+    /** Sales that still stand: everything but the cancelled ones. */
+    public function scopeNotCancelled($query)
+    {
+        return $query->whereDoesntHave('cancellation');
+    }
+
     public function referrer()
     {
         return $this->belongsTo(Customer::class, 'referral_customer_id');

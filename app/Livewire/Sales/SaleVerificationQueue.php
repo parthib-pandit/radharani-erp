@@ -18,7 +18,7 @@ use Livewire\Component;
  */
 class SaleVerificationQueue extends Component
 {
-    use WithDataTable;
+    use WithDataTable, \App\Livewire\Concerns\CancelsSales;
 
     protected function sortableColumns(): array
     {
@@ -41,7 +41,7 @@ class SaleVerificationQueue extends Component
     public function startVerify(int $saleId): void
     {
         abort_unless(Auth::user()?->can('sale.approve'), 403);
-        $this->verifyingId = Sale::where('confirmed_by_accountant', false)->findOrFail($saleId)->id;
+        $this->verifyingId = Sale::notCancelled()->where('confirmed_by_accountant', false)->findOrFail($saleId)->id;
         $this->tallyNumber = '';
         $this->resetValidation();
         $this->showVerify = true;
@@ -60,7 +60,7 @@ class SaleVerificationQueue extends Component
         ], ['tallyNumber' => 'Tally bill number']);
 
         $sale = Sale::with('items', 'customer')->findOrFail($this->verifyingId);
-        if ($sale->confirmed_by_accountant) {
+        if ($sale->confirmed_by_accountant || $sale->isCancelled()) {
             $this->showVerify = false;
 
             return;
@@ -84,7 +84,7 @@ class SaleVerificationQueue extends Component
     public function render()
     {
         $query = Sale::with('customer', 'creator', 'items')->withSum('payments', 'amount')
-            ->where('confirmed_by_accountant', false)
+            ->where('confirmed_by_accountant', false)->notCancelled()
             ->when($this->search, fn ($q) => $q->where(fn ($q) => $q->where('id', ltrim($this->search, '#'))
                 ->orWhereHas('customer', fn ($c) => $c->where('name', 'like', "%{$this->search}%")->orWhere('phone', 'like', "%{$this->search}%"))));
 

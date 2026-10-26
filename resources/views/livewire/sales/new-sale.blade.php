@@ -1,6 +1,10 @@
 <div>
     <x-ui.page-header title="New Sale" subtitle="Customer, items, charges, payment, then review. You can go back to any step."
-        :crumbs="[['label' => 'Sales & Billing', 'href' => route('sales.history')], ['label' => 'New Sale']]" />
+        :crumbs="[['label' => 'Sales & Billing', 'href' => route('sales.history')], ['label' => 'New Sale']]">
+        <x-slot:actions>
+            <x-ui.button variant="ghost" icon="x-circle" x-on:click="$dispatch('rj-confirm', { title: 'Cancel this sale?', message: 'Nothing has been saved yet. What you entered on this bill is thrown away.', confirm: 'Cancel the sale', tone: 'danger', action: () => $wire.cancelDraft() })">Cancel sale</x-ui.button>
+        </x-slot:actions>
+    </x-ui.page-header>
 
     @if ($exchangeCredit !== null)
         <div class="mb-6 flex items-center gap-3 p-4 rounded-card border bg-gold-tint/60 border-gold-soft text-[13px]">

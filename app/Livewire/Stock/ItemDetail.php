@@ -99,7 +99,7 @@ class ItemDetail extends Component
     {
         $this->item->load('packet.box', 'sourcePurchaseItem.purchase.vendor', 'sourceKarigarBatch');
 
-        $sale = $this->item->sales()->with('customer')->latest('sales.id')->first();
+        $sale = $this->item->sales()->notCancelled()->with('customer')->latest('sales.id')->first();
         $lastOut = in_array($this->item->status, ['dispatched', 'pending_review'], true)
             ? Movement::where('trackable_type', 'item')->where('trackable_id', $this->item->id)->latest('id')->first()
             : null;

@@ -88,7 +88,15 @@ class StockHistoryService
             }
         }
 
-        foreach ($item->sales()->get() as $sale) {
+        foreach ($item->sales()->with('cancellation.user')->get() as $sale) {
+            if ($sale->cancellation) {
+                $events->push([
+                    'at' => $sale->cancellation->created_at, 'kind' => 'sale', 'icon' => 'x-circle', 'tone' => 'danger',
+                    'title' => 'Sale cancelled, back in stock', 'meta' => array_filter(['Sale #' . $sale->id]), 'note' => $sale->cancellation->reason,
+                    'user' => $sale->cancellation->user?->name, 'photo' => null,
+                    'link' => \Route::has('sales.invoice') ? route('sales.invoice', $sale) : null,
+                ]);
+            }
             $events->push([
                 'at' => $sale->created_at,
                 'kind' => 'sale',

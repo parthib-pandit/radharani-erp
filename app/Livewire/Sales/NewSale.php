@@ -487,6 +487,14 @@ class NewSale extends Component
         $this->dispatch('toast', message: "{$item->label} moved to the counter.", type: 'success');
     }
 
+    // Cancel the bill at any point: nothing has been saved yet, so nothing is held or paid, and the form is simply left.
+    public function cancelDraft()
+    {
+        session()->flash('toast', 'The sale was cancelled. Nothing was saved.');
+
+        return $this->redirectRoute('sales.history');
+    }
+
     public function canOverride(): bool
     {
         return (bool) Auth::user()?->can('sale.approve');

@@ -61,7 +61,7 @@ class CustomerDetail extends Component
     public function render()
     {
         return view('livewire.admin.customer-detail', [
-            'sales' => $this->customer->sales()->with('items')->withSum('payments', 'amount')->orderByDesc('id')->get(),
+            'sales' => $this->customer->sales()->notCancelled()->with('items')->withSum('payments', 'amount')->orderByDesc('id')->get(),
             'ledger' => $this->tab === 'ledger' ? app(\App\Services\LedgerService::class)->forCustomer($this->customer) : null,
             'advanceBalance' => app(AdvanceService::class)->balance($this->customer->id),
             'orders' => Order::where('customer_id', $this->customer->id)->orderByDesc('id')->get(),

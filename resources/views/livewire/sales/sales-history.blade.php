@@ -18,7 +18,7 @@
         <x-slot:toolbar>
             <x-ui.search-input wire:model.live.debounce.300ms="search" placeholder="Sale #, Tally bill, customer or phone" class="w-full sm:w-[280px]" />
             <div class="rj-segment">
-                @foreach (['' => 'All', 'verified' => 'Verified', 'reserved' => 'Reserved', 'balance' => 'Balance due'] as $value => $name)
+                @foreach (['' => 'All', 'verified' => 'Verified', 'reserved' => 'Reserved', 'balance' => 'Balance due'] + ($stats['cancelled'] ? ['cancelled' => 'Cancelled'] : []) as $value => $name)
                     <button type="button" wire:click="$set('status', '{{ $value }}')" class="{{ $status === $value ? 'is-active' : '' }}">{{ $name }}</button>
                 @endforeach
             </div>
@@ -43,12 +43,16 @@
                 <td class="text-ink_text-primary">{{ $sale->customer->name ?? '—' }}</td>
                 <td class="text-[12.5px] text-ink_text-secondary whitespace-nowrap">{{ $sale->created_at?->format('d M Y') }}</td>
                 <td class="text-right tabular text-ink_text-primary">₹{{ number_format($sale->total, 2) }}</td>
-                @php $bal = $sale->total - (float) $sale->payments_sum_amount; @endphp
+                @php $bal = $sale->cancellation ? 0 : $sale->total - (float) $sale->payments_sum_amount; @endphp
                 <td class="text-right tabular {{ $bal > 0.005 ? 'text-warning font-semibold' : 'text-ink_text-muted' }}">{{ $bal > 0.005 ? '₹' . number_format($bal, 2) : '-' }}</td>
                 <td>
-                    <x-ui.badge :tone="$sale->confirmed_by_accountant ? 'success' : 'warning'" size="sm" dot>
-                        {{ $sale->confirmed_by_accountant ? 'Verified' : 'Reserved' }}
-                    </x-ui.badge>
+                    @if ($sale->cancellation)
+                        <x-ui.badge tone="danger" size="sm" dot title="{{ $sale->cancellation->reason }}">Cancelled</x-ui.badge>
+                    @else
+                        <x-ui.badge :tone="$sale->confirmed_by_accountant ? 'success' : 'warning'" size="sm" dot>
+                            {{ $sale->confirmed_by_accountant ? 'Verified' : 'Reserved' }}
+                        </x-ui.badge>
+                    @endif
                 </td>
                 <td>
                     <div class="flex justify-end">

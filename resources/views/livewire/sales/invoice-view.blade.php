@@ -2,15 +2,33 @@
     <x-ui.page-header :title="'Sale ' . $sale->bill_number" subtitle="Pieces, charges and payments as recorded on this sale."
         :crumbs="[['label' => 'Sales History', 'href' => route('sales.history')], ['label' => $sale->bill_number]]">
         <x-slot:meta>
-            <x-ui.badge :tone="$sale->confirmed_by_accountant ? 'success' : 'warning'" size="lg">{{ $sale->confirmed_by_accountant ? 'Verified' : 'Waiting for admin' }}</x-ui.badge>
+            @if ($sale->cancellation)
+                <x-ui.badge tone="danger" size="lg">Cancelled</x-ui.badge>
+            @else
+                <x-ui.badge :tone="$sale->confirmed_by_accountant ? 'success' : 'warning'" size="lg">{{ $sale->confirmed_by_accountant ? 'Verified' : 'Waiting for admin' }}</x-ui.badge>
+            @endif
             @if ($sale->balance > 0)<x-ui.badge tone="danger" size="lg">Balance ₹{{ number_format($sale->balance, 2) }}</x-ui.badge>@endif
         </x-slot:meta>
         <x-slot:actions>
+            @if ($canCancel)
+                <x-ui.button variant="danger-soft" icon="x-circle" wire:click="startCancel({{ $sale->id }})" target="startCancel">Cancel sale</x-ui.button>
+            @endif
             <x-ui.button variant="secondary" icon="printer" :href="route('sales.bill', $sale)" target="_blank">Print bill</x-ui.button>
         </x-slot:actions>
     </x-ui.page-header>
 
-    @unless ($sale->confirmed_by_accountant)
+    @if ($sale->cancellation)
+        <div class="bg-danger-bg text-danger rounded-control px-3.5 py-3 mb-5 text-[13px] max-w-[860px]">
+            <div class="flex items-center gap-2 font-semibold"><x-ui.icon name="x-circle" :size="14" class="shrink-0" /> This sale was cancelled on {{ $sale->cancellation->created_at->format('j M Y, g:i a') }} by {{ $sale->cancellation->user?->name }}.</div>
+            <p class="mt-1">Reason: {{ $sale->cancellation->reason }}.
+                The pieces are back in stock.
+                @if ((float) $sale->cancellation->credit_returned > 0) ₹{{ number_format($sale->cancellation->credit_returned, 2) }} of exchange credit and advance went back to the customer.@endif
+                @if ((float) $sale->cancellation->held_on_account > 0) ₹{{ number_format($sale->cancellation->held_on_account, 2) }} that was paid is held on the customer's account as an advance.@endif
+            </p>
+        </div>
+    @endif
+
+    @unless ($sale->confirmed_by_accountant || $sale->cancellation)
         <div class="bg-warning-bg text-warning rounded-control px-3.5 py-2.5 mb-5 text-[12.5px] flex items-center gap-2 max-w-[860px]">
             <x-ui.icon name="alert-triangle" :size="13" class="shrink-0" /> The pieces are held for this sale. It becomes final when an admin verifies it.
         </div>
@@ -60,7 +78,7 @@
                 @empty <p class="text-[13px] text-ink_text-muted">Nothing paid yet.</p> @endforelse
                 <div class="flex justify-between mt-3 pt-3 border-t border-line-light font-semibold"><span>Balance</span><span class="tabular {{ $sale->balance > 0 ? 'text-warning' : 'text-success' }}">₹{{ number_format($sale->balance, 2) }}</span></div>
 
-                @if ($sale->balance > 0)
+                @if ($sale->balance > 0 && ! $sale->cancellation)
                     <form wire:submit="addPayment" class="mt-5 pt-4 border-t border-line-light space-y-3">
                         <div class="flex gap-2"><select wire:model="mode" class="rj-select w-[120px]" aria-label="Mode">@foreach ($modes as $v => $l)<option value="{{ $v }}">{{ $l }}</option>@endforeach</select>
                             <input type="number" step="0.01" min="0" wire:model="amount" placeholder="₹" class="rj-input tabular flex-1 @error('amount') is-invalid @enderror" aria-label="Amount"></div>
@@ -82,4 +100,5 @@
             </x-ui.card>
         </div>
     </div>
+    <x-sales.cancel-modal />
 </div>
