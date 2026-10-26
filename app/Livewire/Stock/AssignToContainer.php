@@ -168,7 +168,7 @@ class AssignToContainer extends Component
         $prev = $packet->box_id;
         $packet->update(['box_id' => $box->id]);
         $this->logEntry('success', $packet->code, $from ? "Moved from {$from}" : 'Placed in box', ['type' => 'packet', 'id' => $packet->id, 'prev' => $prev],
-            $packet->items()->count() . ' pieces');
+            $packet->custodyItems()->count() . ' pieces');
     }
 
     public function undo(int $index): void
@@ -347,7 +347,7 @@ class AssignToContainer extends Component
     public function render()
     {
         $dest = match ($this->destType) {
-            'packet' => Packet::withCount('items')->with('box')->find($this->destId),
+            'packet' => Packet::withCount('custodyItems as items_count')->with('box')->find($this->destId),
             'box' => Box::withCount('packets')->find($this->destId),
             default => null,
         };
@@ -366,7 +366,7 @@ class AssignToContainer extends Component
                         ->orWhere('category', 'like', "%{$this->pickSearch}%")
                         ->orWhere('description', 'like', "%{$this->pickSearch}%")))
                     ->orderByDesc('id')->limit(100)->get()
-                : Packet::with('box:id,code')->withCount('items')
+                : Packet::with('box:id,code')->withCount('custodyItems as items_count')
                     ->when($this->pickUnassigned, fn ($q) => $q->whereNull('box_id'))
                     ->when($this->pickDestId, fn ($q) => $q->where(fn ($q) => $q->whereNull('box_id')->orWhere('box_id', '!=', $this->pickDestId)))
                     ->when($this->pickSearch, fn ($q) => $q->where(fn ($q) => $q

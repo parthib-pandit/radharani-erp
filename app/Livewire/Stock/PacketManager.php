@@ -165,8 +165,8 @@ class PacketManager extends Component
             ->select('packets.*')
             ->leftJoin('boxes', 'boxes.id', '=', 'packets.box_id')
             ->addSelect('boxes.code as box_code', 'boxes.label as box_label')
-            ->withCount('items')
-            ->withSum('items', 'weight')
+            ->withCount('custodyItems as items_count')
+            ->withSum('custodyItems as items_sum_weight', 'weight')
             ->withExists('qrCodes')
             ->when($this->search, fn ($q) => $q->where(fn ($q) => $q
                 ->where('packets.code', 'like', "%{$this->search}%")
@@ -184,7 +184,7 @@ class PacketManager extends Component
             'boxes' => Box::orderBy('code')->get(['id', 'code', 'label']),
             'stats' => [
                 'packets' => Packet::count(),
-                'items' => Item::whereNotNull('packet_id')->count(),
+                'items' => Item::whereNotNull('packet_id')->where('status', '!=', 'sold')->count(),
                 'loose' => Packet::whereNull('box_id')->count(),
                 'empty' => Packet::doesntHave('items')->count(),
             ],

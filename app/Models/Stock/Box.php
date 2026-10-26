@@ -37,6 +37,12 @@ class Box extends Model
         return $this->hasManyThrough(Item::class, Packet::class);
     }
 
+    /** The pieces still in the shop's custody: everything but the sold ones (those stay linked, for the history). */
+    public function custodyItems()
+    {
+        return $this->hasManyThrough(Item::class, Packet::class)->where('items.status', '!=', 'sold');
+    }
+
     public function qrCodes()
     {
         return $this->hasMany(QrCode::class, 'target_id')->where('target_type', 'box');

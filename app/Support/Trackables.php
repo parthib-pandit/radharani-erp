@@ -24,7 +24,7 @@ class Trackables
 
         return [
             'item' => $ids['item'] ? Item::whereIn('id', array_unique($ids['item']))->get()->keyBy('id') : collect(),
-            'packet' => $ids['packet'] ? Packet::withCount('items')->whereIn('id', array_unique($ids['packet']))->get()->keyBy('id') : collect(),
+            'packet' => $ids['packet'] ? Packet::withCount('custodyItems as items_count')->whereIn('id', array_unique($ids['packet']))->get()->keyBy('id') : collect(),
             'box' => $ids['box'] ? Box::withCount('packets')->whereIn('id', array_unique($ids['box']))->get()->keyBy('id') : collect(),
         ];
     }

@@ -159,8 +159,9 @@ class ContainerList extends Component
         $boxes = DB::table('boxes')->whereNull('boxes.deleted_at')->selectRaw("
             'box' as kind, boxes.id, boxes.code, boxes.label, NULL as parent_id, NULL as parent_code,
             (select count(*) from packets p where p.box_id = boxes.id and p.deleted_at is null) as child_count,
-            (select count(*) from items i join packets p on p.id = i.packet_id where p.box_id = boxes.id and i.deleted_at is null and p.deleted_at is null) as items_count,
-            (select coalesce(sum(i.weight), 0) from items i join packets p on p.id = i.packet_id where p.box_id = boxes.id and i.deleted_at is null and p.deleted_at is null) as weight,
+            (select count(*) from items i join packets p on p.id = i.packet_id where p.box_id = boxes.id and i.deleted_at is null and p.deleted_at is null and i.status <> 'sold') as items_count,
+            (select count(*) from items i join packets p on p.id = i.packet_id where p.box_id = boxes.id and i.deleted_at is null and p.deleted_at is null and i.status = 'sold') as sold_count,
+            (select coalesce(sum(i.weight), 0) from items i join packets p on p.id = i.packet_id where p.box_id = boxes.id and i.deleted_at is null and p.deleted_at is null and i.status <> 'sold') as weight,
             boxes.created_at,
             (select max(a.created_at) from stock_audits a where a.box_id = boxes.id) as last_audit");
 
@@ -168,8 +169,9 @@ class ContainerList extends Component
             ->whereNull('packets.deleted_at')->selectRaw("
             'packet' as kind, packets.id, packets.code, packets.label, b.id as parent_id, b.code as parent_code,
             0 as child_count,
-            (select count(*) from items i where i.packet_id = packets.id and i.deleted_at is null) as items_count,
-            (select coalesce(sum(i.weight), 0) from items i where i.packet_id = packets.id and i.deleted_at is null) as weight,
+            (select count(*) from items i where i.packet_id = packets.id and i.deleted_at is null and i.status <> 'sold') as items_count,
+            (select count(*) from items i where i.packet_id = packets.id and i.deleted_at is null and i.status = 'sold') as sold_count,
+            (select coalesce(sum(i.weight), 0) from items i where i.packet_id = packets.id and i.deleted_at is null and i.status <> 'sold') as weight,
             packets.created_at,
             NULL as last_audit");
 
@@ -183,8 +185,8 @@ class ContainerList extends Component
             ->when($this->search, fn ($q) => $q->where(fn ($q) => $q
                 ->where('code', 'like', "%{$this->search}%")
                 ->orWhere('label', 'like', "%{$this->search}%")))
-            ->when($this->contents === 'empty', fn ($q) => $q->where('items_count', 0)->where('child_count', 0))
-            ->when($this->contents === 'filled', fn ($q) => $q->where(fn ($q) => $q->where('items_count', '>', 0)->orWhere('child_count', '>', 0)));
+            ->when($this->contents === 'empty', fn ($q) => $q->where('items_count', 0)->where('sold_count', 0)->where('child_count', 0))
+            ->when($this->contents === 'filled', fn ($q) => $q->where(fn ($q) => $q->where('items_count', '>', 0)->orWhere('sold_count', '>', 0)->orWhere('child_count', '>', 0)));
 
         $query->orderBy($this->sortableColumns()[$this->currentSortField()], $this->currentSortDirection())->orderBy('kind')->orderBy('id');
 
@@ -195,7 +197,7 @@ class ContainerList extends Component
                 'boxes' => Box::count(),
                 'packets' => Packet::count(),
                 'loosePackets' => Packet::whereNull('box_id')->count(),
-                'empty' => $this->union()->where('items_count', 0)->where('child_count', 0)->count(),
+                'empty' => $this->union()->where('items_count', 0)->where('sold_count', 0)->where('child_count', 0)->count(),
             ],
         ])->layout('components.layouts.app', ['title' => 'Boxes & Packets · Radharani Jewellery ERP']);
     }

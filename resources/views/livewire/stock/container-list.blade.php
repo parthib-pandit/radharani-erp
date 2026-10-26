@@ -48,7 +48,7 @@
             @php
                 $isBox = $row->kind === 'box';
                 $href = route($isBox ? 'stock.boxes.show' : 'stock.packets.show', $row->id);
-                $isEmpty = (int) $row->items_count === 0 && (int) $row->child_count === 0;
+                $isEmpty = (int) $row->items_count === 0 && (int) $row->sold_count === 0 && (int) $row->child_count === 0;
             @endphp
             <tr wire:key="{{ $row->kind }}-{{ $row->id }}">
                 <td>
@@ -73,7 +73,12 @@
                     @elseif ($row->parent_code) <a href="{{ route('stock.boxes.show', $row->parent_id) }}" class="hover:text-gold-dark">{{ $row->parent_code }}</a>
                     @else <span class="text-ink_text-muted">No box</span> @endif
                 </td>
-                <td class="text-right tabular">{{ $row->items_count }}</td>
+                <td class="text-right tabular">
+                    {{ $row->items_count }}
+                    @if ((int) $row->sold_count > 0)
+                        <span class="block text-[11.5px] font-normal text-ink_text-muted" title="Sold pieces stay on record here but are not counted">{{ $row->sold_count }} sold</span>
+                    @endif
+                </td>
                 <td class="text-right tabular text-ink_text-secondary">{{ (float) $row->weight ? number_format($row->weight, 3) . ' g' : '-' }}</td>
                 <td class="text-ink_text-secondary text-[12.5px] whitespace-nowrap">{{ \Illuminate\Support\Carbon::parse($row->created_at)->format('d M Y') }}</td>
                 <td>

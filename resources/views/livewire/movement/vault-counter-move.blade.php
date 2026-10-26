@@ -193,9 +193,12 @@
                             @if ($r['soldInside'])
                                 <x-ui.badge tone="warning" size="sm" class="mt-1">{{ $r['soldInside'] }} sold inside</x-ui.badge>
                             @endif
+                            @if ($r['reservedInside'])
+                                <x-ui.badge tone="info" size="sm" class="mt-1">{{ $r['reservedInside'] }} reserved inside</x-ui.badge>
+                            @endif
                         </div>
                         @if ($r['sold'])
-                            <x-ui.badge size="sm">Sold</x-ui.badge>
+                            <x-ui.badge size="sm">{{ $r['status'] === 'reserved' ? 'Reserved' : 'Sold' }}</x-ui.badge>
                         @else
                             <span class="text-[11.5px] text-ink_text-muted text-right leading-tight whitespace-nowrap">
                                 {{ $r['since']->isToday() ? $r['since']->format('g:i a') : $r['since']->format('j M') }}

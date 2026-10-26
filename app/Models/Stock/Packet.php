@@ -33,6 +33,12 @@ class Packet extends Model
         return $this->hasMany(Item::class);
     }
 
+    /** The pieces still in the shop's custody: everything but the sold ones (those stay linked, for the history). */
+    public function custodyItems()
+    {
+        return $this->hasMany(Item::class)->where('items.status', '!=', 'sold');
+    }
+
     public function qrCodes()
     {
         return $this->hasMany(QrCode::class, 'target_id')->where('target_type', 'packet');

@@ -450,7 +450,8 @@ class VaultCounterMove extends Component
                 'place' => $places[$m->location_id ?? $defaultFloor] ?? null,
                 'since' => $m->created_at,
                 'by' => $m->user?->name,
-                'sold' => in_array($status, ['sold', 'reserved'], true),
+                'sold' => in_array($status, ['sold', 'reserved'], true), // out of the shop's hands either way: not expected back
+                'status' => $status,
                 'scanned' => $inTray->has($m->trackable_type . ':' . $m->trackable_id),
             ];
         });
@@ -463,12 +464,15 @@ class VaultCounterMove extends Component
                 'item' => $r['model']?->packet?->code,
                 default => null,
             };
-            $r['soldInside'] = match ($r['type']) {
-                'packet' => Item::where('packet_id', $r['model']?->id)->whereIn('status', ['sold', 'reserved'])->count(),
+            // Sold pieces are out of custody; reserved ones (in a sale nobody has verified yet) are only held back.
+            $inside = fn (string $status) => match ($r['type']) {
+                'packet' => Item::where('packet_id', $r['model']?->id)->where('status', $status)->count(),
                 'box' => Item::whereIn('packet_id', \App\Models\Stock\Packet::where('box_id', $r['model']?->id)->select('id'))
-                    ->whereIn('status', ['sold', 'reserved'])->count(),
+                    ->where('status', $status)->count(),
                 default => 0,
             };
+            $r['soldInside'] = $inside('sold');
+            $r['reservedInside'] = $inside('reserved');
 
             return $r;
         });

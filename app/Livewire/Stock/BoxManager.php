@@ -117,8 +117,8 @@ class BoxManager extends Component
     public function render()
     {
         $query = Box::query()
-            ->withCount(['packets', 'items'])
-            ->withSum('items', 'weight')
+            ->withCount(['packets', 'custodyItems as items_count'])
+            ->withSum('custodyItems as items_sum_weight', 'weight')
             ->withExists('qrCodes')
             ->when($this->search, fn ($q) => $q->where(fn ($q) => $q
                 ->where('code', 'like', "%{$this->search}%")
@@ -131,7 +131,7 @@ class BoxManager extends Component
             'stats' => [
                 'boxes' => Box::count(),
                 'packets' => Packet::whereNotNull('box_id')->count(),
-                'items' => Item::whereHas('packet', fn ($q) => $q->whereNotNull('box_id'))->count(),
+                'items' => Item::where('status', '!=', 'sold')->whereHas('packet', fn ($q) => $q->whereNotNull('box_id'))->count(),
                 'loosePackets' => Packet::whereNull('box_id')->count(),
             ],
         ])->layout('components.layouts.app', ['title' => 'Boxes · Radharani Jewellery ERP']);
