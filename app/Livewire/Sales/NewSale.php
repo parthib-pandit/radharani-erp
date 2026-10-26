@@ -49,6 +49,10 @@ class NewSale extends Component
     public ?int $schemeId = null;
 
 
+    // A piece to put on the bill from the start: "Add sale" on a piece's own page.
+    #[Url(as: 'item', except: '')]
+    public ?int $startItemId = null;
+
     // ---- 1. customer
     public string $customerSearch = '';
     #[Url(as: 'customer', except: '')]
@@ -111,6 +115,16 @@ class NewSale extends Component
         }
         if ($this->customerId && ! Customer::whereKey($this->customerId)->exists()) {
             $this->customerId = null;
+        }
+        if ($this->startItemId) {
+            $piece = Item::find($this->startItemId);
+            $this->startItemId = null; // only starts the bill: the piece can be taken off like any other
+            if ($piece && $piece->status === 'in_stock') {
+                $this->cart[$piece->id] = $this->cartLine($piece);
+                $this->addDefaultCharges($piece);
+            } elseif ($piece) {
+                $this->dispatch('toast', message: "{$piece->label} is " . str_replace('_', ' ', $piece->status) . ' and can not be billed.', type: 'error');
+            }
         }
         if ($this->customerId) {
             $this->step = max($this->step, 2);

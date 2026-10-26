@@ -23,6 +23,15 @@
         @endif
     @endif
 
+    @if ($step === 1 && $cart)
+        <div class="mb-6 flex items-center gap-3 p-4 rounded-card border bg-gold-tint/60 border-gold-soft text-[13px]">
+            <x-ui.icon name="gem" :size="16" class="text-gold-dark shrink-0" />
+            <span>On this bill:
+                @foreach ($cart as $line)<strong class="rj-code">{{ $line['label'] }}</strong> <span class="text-ink_text-secondary">{{ $line['category'] }} · {{ number_format($line['weight_listed'], 3) }} g</span>{{ ! $loop->last ? ', ' : '' }}@endforeach.
+                Choose the customer to go on.</span>
+        </div>
+    @endif
+
     <x-ui.stepper :steps="$steps" :current="$step" :reach="$reach" />
 
     <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">

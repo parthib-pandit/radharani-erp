@@ -177,4 +177,28 @@ class SaleBargainTest extends TestCase
         $this->assertEquals(72, (float) $sale->final_discount);
         $this->assertEquals(12200, (float) $sale->total);
     }
+
+    public function test_add_sale_on_a_piece_opens_a_bill_with_it_on_and_asks_for_the_customer(): void
+    {
+        $item = $this->piece();
+
+        $this->get(route('stock.items.show', $item))->assertOk()->assertSee('Add sale')->assertSee(route('sales.new', ['item' => $item->id]), false);
+
+        $c = Livewire::withQueryParams(['item' => $item->id])->test(NewSale::class);
+        $this->assertSame(1, $c->get('step'), 'the customer comes first');
+        $this->assertArrayHasKey($item->id, $c->get('cart'));
+        $c->assertSee('On this bill');
+        $c->set('customerId', Customer::create(['name' => 'From Piece', 'phone' => (string) random_int(6000000000, 9999999999)])->id)->call('next')
+            ->assertSet('step', 2);
+    }
+
+    public function test_add_sale_is_not_offered_for_a_piece_that_can_not_be_sold(): void
+    {
+        $item = $this->piece();
+        $item->update(['status' => 'sold']);
+
+        $this->get(route('stock.items.show', $item))->assertOk()->assertDontSee('Add sale');
+        $c = Livewire::withQueryParams(['item' => $item->id])->test(NewSale::class);
+        $this->assertSame([], $c->get('cart'));
+    }
 }

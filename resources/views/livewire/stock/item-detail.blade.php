@@ -29,6 +29,9 @@
             @endif
         </x-slot:meta>
         <x-slot:actions>
+            @if ($item->status === 'in_stock' && auth()->user()?->can('sale.create'))
+                <x-ui.button icon="receipt" :href="route('sales.new', ['item' => $item->id])">Add sale</x-ui.button>
+            @endif
             <x-ui.button variant="secondary" icon="package" wire:click="openMove">{{ $item->packet ? 'Move' : 'Put in packet' }}</x-ui.button>
             @if (! $item->deletionBlocker())
                 <x-ui.button variant="danger-soft" icon="trash"
