@@ -52,16 +52,20 @@
                 <ul class="space-y-3 text-[13px] text-ink_text-secondary">
                     <li class="flex gap-2.5"><x-ui.icon name="check" :size="15" class="text-success shrink-0 mt-0.5" /><span>First row holds the column names. Any order, any spelling. You match them in the next step.</span></li>
                     <li class="flex gap-2.5"><x-ui.icon name="check" :size="15" class="text-success shrink-0 mt-0.5" /><span><span class="font-semibold text-ink_text-primary">Weight</span> is needed for every piece. Category, purity and the rest can be left out and completed later. The government HUID file works as it is: you pick the metal in the next step.</span></li>
-                    <li class="flex gap-2.5"><x-ui.icon name="check" :size="15" class="text-success shrink-0 mt-0.5" /><span>Pieces without a HUID get an internal code automatically.</span></li>
+                    <li class="flex gap-2.5"><x-ui.icon name="check" :size="15" class="text-success shrink-0 mt-0.5" /><span>Pieces without a HUID get an internal code automatically. A sheet downloaded here already has one in every HUID cell; rows you leave without a weight are skipped and their codes stay unused.</span></li>
                     <li class="flex gap-2.5"><x-ui.icon name="check" :size="15" class="text-success shrink-0 mt-0.5" /><span>Rows that look like pieces already in stock are flagged and left out unless you tick them.</span></li>
                 </ul>
                 <div class="flex flex-wrap items-end gap-2.5 mt-5">
                     <x-ui.field label="Blank sheet for" for="tpl-count" class="w-[130px]">
                         <input id="tpl-count" type="number" min="1" max="500" wire:model="templateCount" class="rj-input tabular" aria-label="Number of pieces">
                     </x-ui.field>
-                    <x-ui.button variant="soft" size="sm" icon="download" wire:click="downloadBlankTemplate">Download blank (HUID format)</x-ui.button>
+                    <x-ui.button variant="soft" size="sm" icon="download" wire:click="downloadBlankTemplate">Download blank sheet</x-ui.button>
                     <x-ui.button variant="ghost" size="sm" icon="download" wire:click="downloadTemplate">Sample sheet</x-ui.button>
                 </div>
+                <label class="mt-3 flex items-start gap-2.5 text-[12.5px] text-ink_text-secondary cursor-pointer">
+                    <input type="checkbox" class="rj-checkbox mt-0.5" wire:model="withCodes">
+                    <span>Fill the HUID column with internal codes. Each piece keeps its code until the real HUID comes, when you update it from HUID export / update. The codes are reserved when you download, so no sheet repeats one.</span>
+                </label>
             </x-ui.card>
         </div>
     @endif
@@ -179,7 +183,7 @@
                         <input type="checkbox" class="rj-checkbox" @checked($r['include']) @disabled($r['errors']) wire:click="toggleInclude({{ $i }})" aria-label="Import row {{ $r['line'] }}">
                     </td>
                     <td class="text-ink_text-muted tabular">{{ $r['line'] }}</td>
-                    <td class="rj-code text-[12px]">{{ $r['data']['huid_code'] ?: 'Auto code' }}</td>
+                    <td class="rj-code text-[12px]">{{ $r['data']['huid_code'] ?: ($r['data']['internal_code'] ?? null ?: 'Auto code') }}</td>
                     <td>
                         <div class="font-semibold">{{ $r['data']['category'] ?: '(missing)' }} <span class="font-normal {{ $r['data']['purity'] === '' ? 'text-warning' : 'text-ink_text-muted' }}">{{ $r['data']['purity'] !== '' ? $r['data']['purity'] : 'no purity' }}</span></div>
                         <div class="text-[12px] text-ink_text-muted truncate max-w-[220px]">{{ $r['data']['description'] }}</div>

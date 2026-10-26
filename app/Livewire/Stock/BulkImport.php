@@ -52,6 +52,8 @@ class BulkImport extends Component
     public string $defaultCategory = '';
     public string $defaultPurity = '';
     public int $templateCount = 10;
+    // The blank sheet comes with the HUID column already filled with internal codes (reserved when it is downloaded).
+    public bool $withCodes = true;
 
     // Step 3
     public array $reviewRows = [];
@@ -110,15 +112,17 @@ class BulkImport extends Component
     public function downloadBlankTemplate()
     {
         $n = max(1, min(500, $this->templateCount));
+        // Reserved now, before the file is sent, so two sheets can never share a code.
+        $codes = $this->withCodes ? \App\Models\Stock\ReservedCode::reserve($n) : collect();
 
-        return response()->streamDownload(function () use ($n) {
+        return response()->streamDownload(function () use ($n, $codes) {
             $out = fopen('php://output', 'w');
             fputcsv($out, ['S No.', 'Item Category', 'No Of Unit', 'HUID', 'Weight of Article (Gms)', 'Purity']);
             for ($i = 1; $i <= $n; $i++) {
-                fputcsv($out, [$i, 'Mix Ornaments', 1, '', '', '']);
+                fputcsv($out, [$i, 'Mix Ornaments', 1, $codes[$i - 1] ?? '', '', '']);
             }
             fclose($out);
-        }, "huid-import-{$n}-rows.csv", ['Content-Type' => 'text/csv']);
+        }, ($codes->isNotEmpty() ? "import-with-codes-{$n}-rows.csv" : "huid-import-{$n}-rows.csv"), ['Content-Type' => 'text/csv']);
     }
 
     public function downloadTemplate()
@@ -167,6 +171,7 @@ class BulkImport extends Component
     {
         $fieldIndex = array_flip(array_filter($this->mapping));
         $existingHuids = Item::whereNotNull('huid_code')->pluck('huid_code')->map(fn ($h) => strtoupper($h))->flip();
+        $reservedCodes = \App\Models\Stock\ReservedCode::pluck('used_item_id', 'code')->all(); // code => the piece that carries it, or null
         $seenHuids = [];
         $this->reviewRows = [];
 
@@ -174,8 +179,17 @@ class BulkImport extends Component
             $chargeProblems = [];
             $get = fn ($field) => isset($fieldIndex[$field]) ? trim((string) ($row[$fieldIndex[$field]] ?? '')) : '';
 
+            // A code that came on a downloaded sheet is the piece's internal code, not a HUID.
+            $cell = strtoupper($get('huid_code'));
+            $isReserved = $cell !== '' && array_key_exists($cell, $reservedCodes);
+            // A row of a downloaded sheet left without a weight is a code nobody used: skipped, the code stays free.
+            if ($isReserved && $reservedCodes[$cell] === null && $get('weight') === '') {
+                continue;
+            }
+
             $data = [
-                'huid_code' => strtoupper($get('huid_code')) ?: null,
+                'huid_code' => $isReserved ? null : ($cell ?: null),
+                'internal_code' => $isReserved ? $cell : null,
                 'category' => ucwords(strtolower($get('category'))) ?: (trim($this->defaultCategory) !== '' ? trim($this->defaultCategory) : 'Uncategorised'),
                 'metal' => $this->parseMetal($get('metal')),
                 'purity' => $get('purity') !== '' ? $get('purity') : trim($this->defaultPurity),
@@ -215,7 +229,12 @@ class BulkImport extends Component
             }
 
             $duplicate = null;
-            if ($data['huid_code']) {
+            if ($data['internal_code']) {
+                if ($reservedCodes[$data['internal_code']] !== null || isset($seenHuids['code:' . $data['internal_code']])) {
+                    $duplicate = $reservedCodes[$data['internal_code']] !== null ? 'Code already on a piece' : 'Same code as row ' . $seenHuids['code:' . $data['internal_code']];
+                }
+                $seenHuids['code:' . $data['internal_code']] ??= $n + 2;
+            } elseif ($data['huid_code']) {
                 if (isset($existingHuids[$data['huid_code']])) {
                     $duplicate = 'HUID already in stock';
                 } elseif (isset($seenHuids[$data['huid_code']])) {
@@ -309,8 +328,8 @@ class BulkImport extends Component
                 $d = $row['data'];
                 $item = Item::create([
                     'huid_code' => $d['huid_code'],
-                    // No HUID -> the curated non-ambiguous internal code (never a second generator).
-                    'internal_code' => $d['huid_code'] ? null : Item::generateInternalCode(),
+                    // A code reserved on the downloaded sheet, else no HUID -> the curated non-ambiguous internal code (never a second generator).
+                    'internal_code' => $d['internal_code'] ?: ($d['huid_code'] ? null : Item::generateInternalCode()),
                     'metal' => $d['metal'],
                     'category' => $d['category'],
                     // Matched to the owner's category tree; a new name is added under that metal for the owner to tidy.
@@ -327,6 +346,9 @@ class BulkImport extends Component
                     'status' => 'on_hold',
                     'entry_batch_id' => $batch->id,
                 ]);
+                if ($d['internal_code']) {
+                    \App\Models\Stock\ReservedCode::claim($d['internal_code'], $item);
+                }
                 $ids[] = $item->id;
             }
 

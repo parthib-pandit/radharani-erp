@@ -102,7 +102,7 @@ class Item extends Model
             for ($i = 0; $i < 5; $i++) {
                 $code .= self::CODE_ALPHABET[random_int(0, strlen(self::CODE_ALPHABET) - 1)];
             }
-        } while (static::where('internal_code', $code)->exists());
+        } while (static::where('internal_code', $code)->exists() || ReservedCode::where('code', $code)->exists());
 
         return $code;
     }
