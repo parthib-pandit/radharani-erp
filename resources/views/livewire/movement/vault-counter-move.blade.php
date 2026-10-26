@@ -67,11 +67,22 @@
                                 @foreach ($locations as $loc)<option value="{{ $loc->id }}">{{ $loc->name }}</option>@endforeach
                             </select>
                         </x-ui.field>
-                    @elseif ($vaultTrays->isNotEmpty())
-                        <x-ui.field label="Put on a tray" for="vc-tray" hint="Optional. Choose a tray to say where in the vault they go. Leave it for just the vault.">
+                    @elseif ($vaultPlaces->count() > 1 || $vaultTrays->isNotEmpty())
+                        @php $many = $vaultPlaces->count() > 1; @endphp
+                        <x-ui.field :label="$many ? 'Return to' : 'Put on a tray'" for="vc-tray"
+                            :hint="$many ? 'Each box goes back to the vault it is kept in. Choose a vault to move boxes there, or a tray to say where in the vault. Pieces follow their packet.' : 'Optional. Choose a tray to say where in the vault they go. Leave it for just the vault.'">
                             <select id="vc-tray" wire:model.live="vaultTrayId" class="rj-select">
-                                <option value="">No tray, just the vault</option>
-                                @foreach ($vaultTrays as $tr)<option value="{{ $tr->id }}">{{ $tr->name }}</option>@endforeach
+                                <option value="">{{ $many ? 'The vault each is kept in' : 'No tray, just the vault' }}</option>
+                                @foreach ($vaultPlaces as $vp)
+                                    @if ($many)
+                                        <optgroup label="{{ $vp->name }}">
+                                            <option value="{{ $vp->id }}">{{ $vp->name }} (the vault itself)</option>
+                                            @foreach ($vp->trays as $tr)<option value="{{ $tr->id }}">{{ $tr->name }}</option>@endforeach
+                                        </optgroup>
+                                    @else
+                                        @foreach ($vp->trays as $tr)<option value="{{ $tr->id }}">{{ $tr->name }}</option>@endforeach
+                                    @endif
+                                @endforeach
                             </select>
                         </x-ui.field>
                     @endif

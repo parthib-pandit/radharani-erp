@@ -10,13 +10,13 @@ class Box extends Model
 {
     use SoftDeletes, LogsActivity;
 
-    protected $fillable = ['code', 'label'];
+    protected $fillable = ['code', 'label', 'home_vault_id'];
 
     // Renames and creation feed the Box Detail history timeline.
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['code', 'label'])
+            ->logOnly(['code', 'label', 'home_vault_id'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges()
             ->useLogName('stock');
@@ -30,6 +30,12 @@ class Box extends Model
     public function packets()
     {
         return $this->hasMany(Packet::class);
+    }
+
+    /** The vault this box is kept in. Empty means the first vault. */
+    public function homeVault()
+    {
+        return $this->belongsTo(\App\Models\Location::class, 'home_vault_id');
     }
 
     public function items()

@@ -110,6 +110,9 @@
                     </div>
                 @endif
                 <dl class="rj-dl mt-4 pt-4 border-t border-line-light">
+                    @if (\App\Models\Location::where('type', 'vault')->count() > 1)
+                        <div><dt>Kept in</dt><dd>{{ \App\Models\Location::find(\App\Models\Location::vaultOf('packet', $packet->id))?->name }}{{ $packet->box ? ' (with its box)' : '' }}</dd></div>
+                    @endif
                     <div>
                         <dt>Box</dt>
                         <dd>

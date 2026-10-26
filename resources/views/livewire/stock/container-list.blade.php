@@ -72,6 +72,9 @@
                     @if ($isBox) <span class="text-ink_text-muted">{{ $row->child_count }} {{ \Illuminate\Support\Str::plural('packet', $row->child_count) }}</span>
                     @elseif ($row->parent_code) <a href="{{ route('stock.boxes.show', $row->parent_id) }}" class="hover:text-gold-dark">{{ $row->parent_code }}</a>
                     @else <span class="text-ink_text-muted">No box</span> @endif
+                    @if ($vaults->count() > 1)
+                        <span class="block font-sans text-[11.5px] text-ink_text-muted">Kept in {{ $vaultNames[$row->vault_id ?: $defaultVaultId] ?? 'the vault' }}</span>
+                    @endif
                 </td>
                 <td class="text-right tabular">
                     {{ $row->items_count }}
@@ -112,6 +115,13 @@
                         @foreach ($boxes as $b)
                             <option value="{{ $b->id }}">{{ $b->code }}{{ $b->label ? ' · ' . $b->label : '' }}</option>
                         @endforeach
+                    </select>
+                </x-ui.field>
+            @endif
+            @if ($vaults->count() > 1 && ($formType === 'box' || ! $box_id))
+                <x-ui.field label="Kept in vault" for="c-vault" error="home_vault_id" hint="It goes back to this vault from the counter. Changing it moves it to the other vault.">
+                    <select id="c-vault" wire:model="home_vault_id" class="rj-select @error('home_vault_id') is-invalid @enderror">
+                        @foreach ($vaults as $vl)<option value="{{ $vl->id }}" @selected(($home_vault_id ?: $defaultVaultId) === $vl->id)>{{ $vl->name }}</option>@endforeach
                     </select>
                 </x-ui.field>
             @endif

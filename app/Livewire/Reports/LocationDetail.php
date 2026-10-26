@@ -20,8 +20,7 @@ class LocationDetail extends Component
     public function render()
     {
         $entries = Location::floorEntries();
-        $vault = Location::vault();
-        $isVault = $this->location->id === $vault?->id;
+        $isVault = $this->location->type === 'vault';
 
         // Containers recorded as being here (the vault holds everything not recorded elsewhere).
         $here = $entries->filter(fn ($e) => $e['location_id'] === $this->location->id);

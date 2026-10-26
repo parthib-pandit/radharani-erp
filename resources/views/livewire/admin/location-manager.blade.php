@@ -6,7 +6,7 @@
         </x-slot:actions>
     </x-ui.page-header>
 
-    <p class="rj-help mb-3">Trays are places inside the vault. When pieces go back to the vault, staff can say which tray, and the vault shows what is on each one.</p>
+    <p class="rj-help mb-3">The shop can have several vaults. Each box is kept in one, so what goes to the counter goes back to the vault it came from. Trays are places inside a vault; when pieces go back, staff can say which tray.</p>
     <x-ui.card :padding="false">
         <x-ui.table :headers="['Location', 'Type', 'Order', 'Moves', 'Status', '']">
             @foreach ($locations as $l)
@@ -16,16 +16,18 @@
                             <a href="{{ route('reports.location.show', $l) }}" class="hover:text-gold-dark">{{ $l->name }}</a>
                         @else {{ $l->name }} @endif
                     </td>
-                    <td><x-ui.badge size="sm" :tone="$l->type === 'vault' ? 'dark' : ($l->type === 'tray' ? 'info' : 'gold')">{{ $types[$l->type] }}</x-ui.badge></td>
+                    <td>
+                        <x-ui.badge size="sm" :tone="$l->type === 'vault' ? 'dark' : ($l->type === 'tray' ? 'info' : 'gold')">{{ $l->type === 'tray' ? 'Tray' : $types[$l->type] }}</x-ui.badge>
+                        @if ($l->type === 'tray' && $l->parent_id)<span class="ml-1.5 text-[12px] text-ink_text-muted">in {{ $locations->firstWhere('id', $l->parent_id)?->name }}</span>@endif
+                        @if ($l->type === 'vault' && $l->keptCount() > 0)<span class="ml-1.5 text-[12px] text-ink_text-muted">{{ $l->keptCount() }} {{ \Illuminate\Support\Str::plural('box', $l->keptCount()) }} and packets kept here</span>@endif
+                    </td>
                     <td class="tabular">{{ $l->sort_order }}</td>
                     <td class="tabular text-ink_text-secondary">{{ $l->movements_count }}</td>
                     <td><x-ui.badge size="sm" :tone="$l->is_active ? 'success' : 'neutral'">{{ $l->is_active ? 'On' : 'Off' }}</x-ui.badge></td>
                     <td>
                         <div class="flex justify-end gap-1">
                             <x-ui.button variant="ghost" size="icon-sm" icon="edit" wire:click="edit({{ $l->id }})" aria-label="Edit {{ $l->name }}" />
-                            @if ($l->type !== 'vault')
-                                <x-ui.button variant="secondary" size="sm" wire:click="toggle({{ $l->id }})">{{ $l->is_active ? 'Switch off' : 'Switch on' }}</x-ui.button>
-                            @endif
+                            <x-ui.button variant="secondary" size="sm" wire:click="toggle({{ $l->id }})">{{ $l->is_active ? 'Switch off' : 'Switch on' }}</x-ui.button>
                         </div>
                     </td>
                 </tr>
@@ -44,6 +46,13 @@
                     @foreach ($types as $v => $label)<option value="{{ $v }}">{{ $label }}</option>@endforeach
                 </select>
             </x-ui.field>
+            @if ($type === 'tray' && $vaults->count() > 1)
+                <x-ui.field label="Inside which vault" for="loc-vault" error="parent_id">
+                    <select id="loc-vault" wire:model="parent_id" class="rj-select">
+                        @foreach ($vaults as $vl)<option value="{{ $vl->id }}">{{ $vl->name }}</option>@endforeach
+                    </select>
+                </x-ui.field>
+            @endif
             <x-ui.field label="Order in lists" for="loc-order" error="sort_order">
                 <input id="loc-order" type="number" min="0" wire:model="sort_order" class="rj-input tabular">
             </x-ui.field>

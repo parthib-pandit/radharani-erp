@@ -151,9 +151,9 @@ class Dashboard extends Component
 
         // In-store places other than the vault (counters, displays...), by name.
         $names = Location::pluck('name', 'id');
-        $vaultId = Location::vault()?->id;
+        $vaultIds = collect(Location::vaultIds());
         $trayIds = Location::where('type', 'tray')->pluck('id');
-        $floor = collect(Location::itemLocations())->reject(fn ($l) => $l === $vaultId || $trayIds->contains($l))->countBy()
+        $floor = collect(Location::itemLocations())->reject(fn ($l) => $vaultIds->contains($l) || $trayIds->contains($l))->countBy()
             ->mapWithKeys(fn ($n, $id) => [$names[$id] ?? 'Counter' => $n]);
 
         $counterN = (int) $counter->n;

@@ -87,6 +87,9 @@
                     </div>
                 @endif
                 <dl class="rj-dl mt-4 pt-4 border-t border-line-light">
+                    @if (\App\Models\Location::where('type', 'vault')->count() > 1)
+                        <div><dt>Kept in</dt><dd>{{ \App\Models\Location::find(\App\Models\Location::vaultOf('box', $box->id))?->name }}</dd></div>
+                    @endif
                     <div><dt>Created</dt><dd>{{ $box->created_at?->format('d M Y') }}</dd></div>
                     <div><dt>Last change</dt><dd>{{ $box->updated_at?->diffForHumans() }}</dd></div>
                 </dl>

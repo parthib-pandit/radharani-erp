@@ -10,14 +10,14 @@ class Packet extends Model
 {
     use SoftDeletes, LogsActivity;
 
-    protected $fillable = ['box_id', 'code', 'label'];
+    protected $fillable = ['box_id', 'code', 'label', 'home_vault_id'];
 
     // box_id changes are how a packet's "moved to another box" history is
     // reconstructed on Packet Detail and Box Detail.
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['box_id', 'code', 'label'])
+            ->logOnly(['box_id', 'code', 'label', 'home_vault_id'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges()
             ->useLogName('stock');
@@ -26,6 +26,12 @@ class Packet extends Model
     public function box()
     {
         return $this->belongsTo(Box::class);
+    }
+
+    /** The vault a packet that is not in a box is kept in (a packet in a box follows its box). */
+    public function homeVault()
+    {
+        return $this->belongsTo(\App\Models\Location::class, 'home_vault_id');
     }
 
     public function items()
