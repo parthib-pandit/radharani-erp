@@ -56,10 +56,10 @@
                     <li class="flex gap-2.5"><x-ui.icon name="check" :size="15" class="text-success shrink-0 mt-0.5" /><span>Rows that look like pieces already in stock are flagged and left out unless you tick them.</span></li>
                 </ul>
                 <div class="flex flex-wrap items-end gap-2.5 mt-5">
-                    <x-ui.field label="Blank sheet for" for="tpl-count" class="w-[130px]">
+                    <x-ui.field label="Pieces you will upload" for="tpl-count" class="w-[170px]">
                         <input id="tpl-count" type="number" min="1" max="500" wire:model="templateCount" class="rj-input tabular" aria-label="Number of pieces">
                     </x-ui.field>
-                    <x-ui.button variant="soft" size="sm" icon="download" wire:click="downloadBlankTemplate">Download blank sheet</x-ui.button>
+                    <x-ui.button variant="soft" size="sm" icon="download" wire:click="downloadBlankTemplate">{{ $withCodes ? 'Download sheet with codes' : 'Download blank sheet' }}</x-ui.button>
                     <x-ui.button variant="ghost" size="sm" icon="download" wire:click="downloadTemplate">Sample sheet</x-ui.button>
                 </div>
                 <label class="mt-3 flex items-start gap-2.5 text-[12.5px] text-ink_text-secondary cursor-pointer">

@@ -110,4 +110,19 @@ class ReservedCodesTest extends TestCase
         $this->assertSame('AB12CD', $rows[0]['data']['huid_code']);
         $this->assertNull($rows[0]['data']['internal_code']);
     }
+
+    public function test_fifty_pieces_gives_a_csv_of_fifty_rows_each_with_its_own_code(): void
+    {
+        $c = Livewire::test(BulkImport::class)->set('templateCount', 50)->call('downloadBlankTemplate');
+
+        $csv = base64_decode($c->effects['download']['content']);
+        $lines = array_values(array_filter(explode("\n", str_replace("\r", '', $csv))));
+        $header = str_getcsv(array_shift($lines));
+        $this->assertSame('HUID', $header[3]);
+        $this->assertCount(50, $lines);
+
+        $codes = array_map(fn ($l) => str_getcsv($l)[3], $lines);
+        $this->assertCount(50, array_unique($codes), 'every row has a different code');
+        $this->assertTrue(collect($codes)->every(fn ($code) => strlen($code) === 5 && ReservedCode::isTaken($code)), 'and every code is reserved');
+    }
 }
