@@ -61,6 +61,7 @@ $nav = [
         ['route' => 'purchases.new', 'label' => 'New Purchase'],
         ['route' => 'purchases.list', 'label' => 'Purchase List'],
     ]],
+    ['type' => 'link', 'route' => 'cashbook', 'label' => 'Cash Book', 'icon' => 'wallet', 'can' => 'cashbook.manage'],
     ['type' => 'link', 'route' => 'notifications.queue', 'label' => 'Messages', 'icon' => 'bell', 'badge' => $pendingMessages],
     ['type' => 'link', 'route' => 'referral', 'label' => 'Referral', 'icon' => 'gift', 'can' => 'referral.manage'],
     ['key' => 'installments', 'label' => 'Installments', 'icon' => 'calendar', 'can' => 'customer.manage', 'items' => [

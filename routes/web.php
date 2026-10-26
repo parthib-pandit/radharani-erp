@@ -20,6 +20,7 @@ require __DIR__.'/orders.php';
 require __DIR__.'/pricing.php';
 require __DIR__.'/sales.php';
 require __DIR__.'/purchases.php';
+require __DIR__.'/cashbook.php';
 require __DIR__.'/notifications.php';
 require __DIR__.'/installments.php';
 require __DIR__.'/reports.php';
