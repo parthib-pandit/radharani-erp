@@ -43,8 +43,6 @@
                                 <td class="text-right tabular text-ink_text-secondary whitespace-nowrap">{{ $packet->items_sum_weight ? number_format($packet->items_sum_weight, 3) . ' g' : '-' }}</td>
                                 <td>
                                     <div class="flex items-center justify-end gap-1">
-                                        <x-ui.button variant="ghost" size="icon-sm" icon="unlink" title="Take out of this box" aria-label="Take {{ $packet->code }} out of this box"
-                                            x-on:click="$dispatch('rj-confirm', { title: 'Take {{ $packet->code }} out of {{ $box->code }}?', message: 'The packet and its pieces stay as they are. It will not belong to any box until you move it again.', confirm: 'Take it out', action: () => $wire.removePacket({{ $packet->id }}) })" />
                                         <x-ui.button variant="secondary" size="sm" iconRight="arrow-right" :href="route('stock.packets.show', $packet)">Open</x-ui.button>
                                     </div>
                                 </td>

@@ -134,7 +134,7 @@ class VaultCounterMove extends Component
         $label = $type === 'item' ? $model->label : $model->code;
 
         if (collect($this->tray)->contains(fn ($t) => $t['type'] === $type && $t['id'] === $model->id)) {
-            $this->feedback('info', $label, 'Already in the tray.');
+            $this->feedback('info', $label, 'This item is already scanned.');
             return;
         }
 

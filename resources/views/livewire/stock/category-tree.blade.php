@@ -15,7 +15,7 @@
                 <ul class="divide-y divide-line-light">
                     @forelse ($node['rows'] as $c)
                         <li wire:key="cat-{{ $c->id }}" class="flex items-center gap-3 px-5 py-3 {{ $c->is_active ? '' : 'opacity-60' }}">
-                            <span class="flex-1 min-w-0 font-semibold text-ink_text-primary truncate">{{ $c->name }}</span>
+                            <a href="{{ route('stock.categories.show', $c) }}" class="flex-1 min-w-0 font-semibold text-ink_text-primary truncate hover:text-gold-dark hover:underline" title="See every piece in {{ $c->name }}">{{ $c->name }}</a>
                             <span class="text-[12px] text-ink_text-muted tabular">{{ $c->items_count }} {{ \Illuminate\Support\Str::plural('piece', $c->items_count) }}</span>
                             @unless ($c->is_active)<x-ui.badge size="sm">Off</x-ui.badge>@endunless
                             <x-ui.button variant="ghost" size="icon-sm" icon="edit" wire:click="edit({{ $c->id }})" aria-label="Edit {{ $c->name }}" />

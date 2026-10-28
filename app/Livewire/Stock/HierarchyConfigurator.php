@@ -27,6 +27,49 @@ class HierarchyConfigurator extends Component
     public string $packetSearch = '';
     public string $itemSearch = '';
 
+    // Each column shows 10 at first (28 Oct, so it stays light on a phone). Load more adds 10, View all lifts the limit.
+    public const PAGE = 10;
+    public array $limit = ['box' => self::PAGE, 'packet' => self::PAGE, 'item' => self::PAGE];
+    public array $all = ['box' => false, 'packet' => false, 'item' => false];
+
+    public function loadMore(string $column): void
+    {
+        if (isset($this->limit[$column])) {
+            $this->limit[$column] += self::PAGE;
+        }
+    }
+
+    public function viewAll(string $column): void
+    {
+        if (isset($this->all[$column])) {
+            $this->all[$column] = true;
+        }
+    }
+
+    public function showFewer(string $column): void
+    {
+        if (isset($this->all[$column])) {
+            $this->all[$column] = false;
+            $this->limit[$column] = self::PAGE;
+        }
+    }
+
+    // A new search starts that column from its first ten again.
+    public function updatedBoxSearch(): void
+    {
+        $this->showFewer('box');
+    }
+
+    public function updatedPacketSearch(): void
+    {
+        $this->showFewer('packet');
+    }
+
+    public function updatedItemSearch(): void
+    {
+        $this->showFewer('item');
+    }
+
     public array $selectedPackets = [];
     public array $selectedItems = [];
 
@@ -61,6 +104,8 @@ class HierarchyConfigurator extends Component
         $this->selectedPackets = [];
         $this->selectedItems = [];
         $this->packetSearch = '';
+        $this->showFewer('packet');
+        $this->showFewer('item');
         $this->openFirstPacket();
     }
 
@@ -69,6 +114,7 @@ class HierarchyConfigurator extends Component
         $this->packetId = $id;
         $this->selectedItems = [];
         $this->itemSearch = '';
+        $this->showFewer('item');
     }
 
     // ------------------------------------------------------------- moves
@@ -160,29 +206,45 @@ class HierarchyConfigurator extends Component
 
     public function render()
     {
-        $boxes = Box::withCount(['packets', 'custodyItems as items_count'])
+        $boxRows = Box::withCount(['packets', 'custodyItems as items_count'])
             ->when($this->boxSearch, fn ($q) => $q->where(fn ($q) => $q->where('code', 'like', "%{$this->boxSearch}%")->orWhere('label', 'like', "%{$this->boxSearch}%")))
             ->orderBy('code')->get();
 
-        $packets = Packet::withCount('custodyItems as items_count')->withSum('custodyItems as items_sum_weight', 'weight')
+        $packetRows = Packet::withCount('custodyItems as items_count')->withSum('custodyItems as items_sum_weight', 'weight')
             ->when($this->boxId === 'none', fn ($q) => $q->whereNull('box_id'), fn ($q) => $q->where('box_id', (int) $this->boxId))
             ->when($this->packetSearch, fn ($q) => $q->where(fn ($q) => $q->where('code', 'like', "%{$this->packetSearch}%")->orWhere('label', 'like', "%{$this->packetSearch}%")))
             ->orderBy('code')->get();
 
-        $items = $this->packetId === ''
-            ? collect()
+        $itemQuery = $this->packetId === ''
+            ? null
             : Item::query()
                 ->when($this->packetId === 'none', fn ($q) => $q->whereNull('packet_id')->where('status', '!=', 'sold'), fn ($q) => $q->where('packet_id', (int) $this->packetId)->where('status', '!=', 'sold'))
                 ->when($this->itemSearch, fn ($q) => $q->where(fn ($q) => $q
                     ->where('huid_code', 'like', "%{$this->itemSearch}%")
                     ->orWhere('internal_code', 'like', "%{$this->itemSearch}%")
-                    ->orWhere('category', 'like', "%{$this->itemSearch}%")))
-                ->orderBy('category')->orderBy('id')->limit(200)->get();
+                    ->orWhere('category', 'like', "%{$this->itemSearch}%")));
+        $itemTotal = $itemQuery ? (clone $itemQuery)->count() : 0;
+        $items = $itemQuery
+            ? $itemQuery->orderBy('category')->orderBy('id')->limit($this->all['item'] ? 1000 : $this->limit['item'])->get()
+            : collect();
+
+        // The first ten (or as many as were asked for), and the one that is open always stays in the list.
+        $slice = function ($rows, string $column, ?string $openId) {
+            $shown = $this->all[$column] ? $rows : $rows->take($this->limit[$column]);
+            if (ctype_digit((string) $openId) && ! $shown->contains('id', (int) $openId) && ($open = $rows->firstWhere('id', (int) $openId))) {
+                $shown = $shown->prepend($open);
+            }
+
+            return $shown->values();
+        };
+        $boxes = $slice($boxRows, 'box', $this->boxId);
+        $packets = $slice($packetRows, 'packet', $this->packetId);
 
         return view('livewire.stock.hierarchy-configurator', [
             'boxes' => $boxes,
             'packets' => $packets,
             'items' => $items,
+            'totals' => ['box' => $boxRows->count(), 'packet' => $packetRows->count(), 'item' => $itemTotal],
             'currentBox' => ctype_digit($this->boxId) ? Box::find((int) $this->boxId) : null,
             'currentPacket' => ctype_digit($this->packetId) ? Packet::find((int) $this->packetId) : null,
             'unboxedCount' => Packet::whereNull('box_id')->count(),
