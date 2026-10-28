@@ -127,7 +127,7 @@
                             </x-ui.field>
                         @endif
                         <x-ui.field label="How many at most" for="b-limit" error="batchLimit">
-                            <input id="b-limit" type="number" min="1" max="300" wire:model.live.debounce.400ms="batchLimit" class="rj-input tabular">
+                            <input id="b-limit" type="text" inputmode="numeric" autocomplete="off" wire:model.live.debounce.400ms="batchLimit" class="rj-input tabular">
                         </x-ui.field>
                     </div>
                     <label class="inline-flex items-center gap-2.5 text-[13px] text-ink_text-primary cursor-pointer select-none">

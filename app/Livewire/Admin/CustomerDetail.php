@@ -48,7 +48,7 @@ class CustomerDetail extends Component
         abort_unless(Auth::user()?->can('customer.manage'), 403);
         $this->validate([
             'advanceAmount' => 'required|numeric|min:1|max:99999999',
-            'advanceMode' => 'required|in:' . implode(',', array_keys(CustomerAdvance::MODES)),
+            'advanceMode' => 'required|in:' . implode(',', array_keys(CustomerAdvance::NEW_MODES)),
             'advanceOccasion' => 'nullable|string|max:80',
             'advanceNote' => 'nullable|string|max:255',
         ], [], ['advanceAmount' => 'amount']);

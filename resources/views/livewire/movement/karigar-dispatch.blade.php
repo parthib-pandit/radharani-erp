@@ -116,7 +116,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <x-ui.field label="Weight handed over" for="kd-weight" error="weight">
                                 <div class="relative">
-                                    <input id="kd-weight" type="number" step="0.001" min="0" wire:model="weight" class="rj-input pr-9 tabular @error('weight') is-invalid @enderror">
+                                    <input id="kd-weight" type="text" inputmode="decimal" autocomplete="off" wire:model="weight" class="rj-input pr-9 tabular @error('weight') is-invalid @enderror">
                                     <span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-[13px] text-ink_text-muted pointer-events-none">g</span>
                                 </div>
                             </x-ui.field>

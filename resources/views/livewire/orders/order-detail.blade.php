@@ -138,8 +138,8 @@
                     @can('orders.manage')
                         <form wire:submit="addAdvance" class="space-y-2.5 pt-3 border-t border-line-light">
                             <div class="flex gap-2">
-                                <select wire:model="advanceMode" class="rj-select w-[110px]" aria-label="Mode">@foreach (\App\Models\Orders\OrderPayment::MODES as $v => $l)<option value="{{ $v }}">{{ $l }}</option>@endforeach</select>
-                                <input type="number" step="0.01" min="0" wire:model="advanceAmount" placeholder="₹" class="rj-input tabular flex-1 @error('advanceAmount') is-invalid @enderror" aria-label="Advance amount">
+                                <x-ui.mode-picker model="advanceMode" :value="$advanceMode" :modes="\App\Models\Orders\OrderPayment::NEW_MODES" />
+                                <input type="text" inputmode="decimal" autocomplete="off" wire:model="advanceAmount" placeholder="₹" class="rj-input tabular flex-1 @error('advanceAmount') is-invalid @enderror" aria-label="Advance amount">
                             </div>
                             @error('advanceAmount')<p class="rj-error">{{ $message }}</p>@enderror
                             <input type="text" wire:model="advanceNote" maxlength="255" placeholder="Note (optional)" class="rj-input" aria-label="Note">

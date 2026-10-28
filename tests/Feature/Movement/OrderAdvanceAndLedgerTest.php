@@ -49,7 +49,7 @@ class OrderAdvanceAndLedgerTest extends TestCase
         $order = $this->order(1000);
 
         $c = Livewire::test(OrderDetail::class, ['order' => $order])
-            ->set('advanceAmount', '4000')->set('advanceMode', 'upi')->set('advanceNote', 'Second visit')->call('addAdvance')->assertHasNoErrors()
+            ->set('advanceAmount', '4000')->set('advanceMode', 'bank')->set('advanceNote', 'Second visit')->call('addAdvance')->assertHasNoErrors()
             ->set('advanceAmount', '2500.50')->set('advanceMode', 'cash')->call('addAdvance')->assertHasNoErrors();
 
         $this->assertEquals(7500.50, $order->fresh()->advancePaid());
@@ -65,6 +65,8 @@ class OrderAdvanceAndLedgerTest extends TestCase
 
         Livewire::test(OrderDetail::class, ['order' => $order])->set('advanceAmount', '0')->call('addAdvance')->assertHasErrors('advanceAmount');
         Livewire::test(OrderDetail::class, ['order' => $order])->set('advanceAmount', '10')->set('advanceMode', 'exchange')->call('addAdvance')->assertHasErrors('advanceMode');
+        // cash and bank are the only choices now; UPI, card and cheque are not offered for a new advance
+        Livewire::test(OrderDetail::class, ['order' => $order])->set('advanceAmount', '10')->set('advanceMode', 'upi')->call('addAdvance')->assertHasErrors('advanceMode');
 
         $order->update(['status' => 'cancelled']);
         Livewire::test(OrderDetail::class, ['order' => $order->fresh()])->set('advanceAmount', '10')->call('addAdvance')->assertStatus(422);

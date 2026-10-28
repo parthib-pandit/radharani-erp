@@ -74,7 +74,7 @@
                 <select id="ue-mt" wire:model="editMakingType" class="rj-select"><option value="">Leave as it is</option><option value="percentage">Percentage</option><option value="flat_per_piece">Flat per piece</option><option value="flat_per_gram">Flat per gram</option></select>
             </x-ui.field>
             <x-ui.field label="Making charge value" for="ue-mv" error="editMakingValue" optional>
-                <input id="ue-mv" type="number" step="0.01" min="0" wire:model="editMakingValue" class="rj-input tabular">
+                <input id="ue-mv" type="text" inputmode="decimal" autocomplete="off" wire:model="editMakingValue" class="rj-input tabular">
             </x-ui.field>
         </div>
         <x-slot:footer>

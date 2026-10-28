@@ -80,8 +80,8 @@
 
                 @if ($sale->balance > 0 && ! $sale->cancellation)
                     <form wire:submit="addPayment" class="mt-5 pt-4 border-t border-line-light space-y-3">
-                        <div class="flex gap-2"><select wire:model="mode" class="rj-select w-[120px]" aria-label="Mode">@foreach ($modes as $v => $l)<option value="{{ $v }}">{{ $l }}</option>@endforeach</select>
-                            <input type="number" step="0.01" min="0" wire:model="amount" placeholder="₹" class="rj-input tabular flex-1 @error('amount') is-invalid @enderror" aria-label="Amount"></div>
+                        <div class="flex gap-2 items-center"><x-ui.mode-picker model="mode" :value="$mode" />
+                            <input type="text" inputmode="decimal" autocomplete="off" wire:model="amount" placeholder="₹" class="rj-input tabular flex-1 @error('amount') is-invalid @enderror" aria-label="Amount"></div>
                         @error('amount')<p class="rj-error">{{ $message }}</p>@enderror
                         <x-ui.button type="submit" size="sm" icon="plus" target="addPayment">Record a payment</x-ui.button>
                     </form>

@@ -184,4 +184,24 @@ class SaleFlowTest extends TestCase
         $this->assertTrue(Customer::where('is_walk_in', true)->exists());
         Livewire::test(CustomerManager::class)->set('search', 'Walk-in')->assertSee('Walk-in customer');
     }
+
+    public function test_cash_and_bank_are_the_only_modes_for_a_later_payment_and_for_a_customer_advance(): void
+    {
+        $this->assertSame(['cash', 'bank'], array_keys(\App\Models\Customer\CustomerAdvance::NEW_MODES));
+        $this->assertSame(['cash', 'bank'], array_keys(\App\Models\Orders\OrderPayment::NEW_MODES));
+
+        $customer = Customer::create(['name' => 'Advance Buyer', 'phone' => (string) random_int(6000000000, 9999999999)]);
+        Livewire::test(\App\Livewire\Admin\CustomerDetail::class, ['customer' => $customer])->set('advanceAmount', '500')->set('advanceMode', 'cheque')->call('receiveAdvance')->assertHasErrors('advanceMode');
+    }
+
+    public function test_every_amount_field_is_a_plain_field_so_a_scroll_never_changes_it(): void
+    {
+        $offenders = [];
+        foreach (new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(resource_path('views'))) as $f) {
+            if ($f->isFile() && str_ends_with($f->getFilename(), '.blade.php') && str_contains(file_get_contents($f->getPathname()), 'type="number"')) {
+                $offenders[] = str_replace(resource_path('views') . '/', '', $f->getPathname());
+            }
+        }
+        $this->assertSame([], $offenders, 'a number field changes its value when the mouse wheel is scrolled over it');
+    }
 }

@@ -40,7 +40,7 @@
                 <input id="cat-name" type="text" wire:model="name" maxlength="50" class="rj-input @error('name') is-invalid @enderror" autofocus>
             </x-ui.field>
             <x-ui.field label="Order in lists" for="cat-order" error="sort_order">
-                <input id="cat-order" type="number" min="0" wire:model="sort_order" class="rj-input tabular">
+                <input id="cat-order" type="text" inputmode="numeric" autocomplete="off" wire:model="sort_order" class="rj-input tabular">
             </x-ui.field>
         </div>
         <x-slot:footer>

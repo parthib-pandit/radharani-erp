@@ -38,13 +38,13 @@
                 <x-ui.field label="Refined weight" for="rr-weight" error="refinedWeight">
                     <div class="rj-input-icon">
                         <x-ui.icon name="scale" :size="16" />
-                        <input id="rr-weight" type="number" step="0.001" min="0" wire:model.live.debounce.300ms="refinedWeight" class="rj-input tabular">
+                        <input id="rr-weight" type="text" inputmode="decimal" autocomplete="off" wire:model.live.debounce.300ms="refinedWeight" class="rj-input tabular">
                     </div>
                 </x-ui.field>
                 <x-ui.field label="Refined purity" for="rr-purity" error="refinedPurity">
                     <div class="rj-input-icon">
                         <x-ui.icon name="percent" :size="16" />
-                        <input id="rr-purity" type="number" step="0.01" min="0" max="100" wire:model.live.debounce.300ms="refinedPurity" class="rj-input tabular">
+                        <input id="rr-purity" type="text" inputmode="decimal" autocomplete="off" wire:model.live.debounce.300ms="refinedPurity" class="rj-input tabular">
                     </div>
                 </x-ui.field>
                 @if ($calc['result'] > 0)
@@ -56,7 +56,7 @@
                 @endif
                 <div class="grid grid-cols-2 gap-3">
                     <x-ui.field label="Extra metal received (g)" for="rr-extra" error="extraWeight" optional hint="Added to the shop's stock as refined metal.">
-                        <input id="rr-extra" type="number" step="0.001" min="0" wire:model="extraWeight" class="rj-input tabular">
+                        <input id="rr-extra" type="text" inputmode="decimal" autocomplete="off" wire:model="extraWeight" class="rj-input tabular">
                     </x-ui.field>
                     <x-ui.field label="About the extra" for="rr-extra-note" error="extraNote" optional>
                         <input id="rr-extra-note" type="text" maxlength="255" wire:model="extraNote" class="rj-input">

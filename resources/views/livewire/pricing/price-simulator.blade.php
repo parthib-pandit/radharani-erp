@@ -25,10 +25,10 @@
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <x-ui.field label="Weight (g)" for="ps-weight">
-                        <input id="ps-weight" type="number" step="0.001" min="0" wire:model.live.debounce.300ms="weight" class="rj-input tabular">
+                        <input id="ps-weight" type="text" inputmode="decimal" autocomplete="off" wire:model.live.debounce.300ms="weight" class="rj-input tabular">
                     </x-ui.field>
                     <x-ui.field label="Net weight (g)" for="ps-net" optional hint="Weight without stones. Leave empty to use the weight.">
-                        <input id="ps-net" type="number" step="0.001" min="0" wire:model.live.debounce.300ms="net_weight" class="rj-input tabular">
+                        <input id="ps-net" type="text" inputmode="decimal" autocomplete="off" wire:model.live.debounce.300ms="net_weight" class="rj-input tabular">
                     </x-ui.field>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -40,11 +40,11 @@
                         </select>
                     </x-ui.field>
                     <x-ui.field label="Making charge value" for="ps-mv">
-                        <input id="ps-mv" type="number" step="0.01" min="0" wire:model.live.debounce.300ms="making_value" class="rj-input tabular">
+                        <input id="ps-mv" type="text" inputmode="decimal" autocomplete="off" wire:model.live.debounce.300ms="making_value" class="rj-input tabular">
                     </x-ui.field>
                 </div>
                 <x-ui.field label="Stone value (₹)" for="ps-stone" optional>
-                    <input id="ps-stone" type="number" step="0.01" min="0" wire:model.live.debounce.300ms="stone_value" class="rj-input tabular">
+                    <input id="ps-stone" type="text" inputmode="decimal" autocomplete="off" wire:model.live.debounce.300ms="stone_value" class="rj-input tabular">
                 </x-ui.field>
                 <label class="mt-4 flex items-center gap-2 text-[13.5px]"><input type="checkbox" wire:model.live="has_huid" class="rj-checkbox"> The piece carries a HUID (the hallmarking charge applies)</label>
             </div>

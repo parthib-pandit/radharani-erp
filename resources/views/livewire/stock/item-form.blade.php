@@ -86,7 +86,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-[180px_minmax(0,1fr)] gap-4">
                         <x-ui.field label="Weight" for="f-weight" error="weight">
                             <div class="relative">
-                                <input id="f-weight" type="number" step="0.001" min="0" wire:model.live.debounce.400ms="weight" class="rj-input pr-9 tabular @error('weight') is-invalid @enderror">
+                                <input id="f-weight" type="text" inputmode="decimal" autocomplete="off" wire:model.live.debounce.400ms="weight" class="rj-input pr-9 tabular @error('weight') is-invalid @enderror">
                                 <span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-[13px] text-ink_text-muted pointer-events-none">g</span>
                             </div>
                         </x-ui.field>
@@ -97,7 +97,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-[180px_minmax(0,1fr)_180px] gap-4 mt-4">
                         <x-ui.field :label="$isDiamond ? 'Gold weight' : 'Net weight'" for="f-net" error="net_weight" optional :hint="$isDiamond ? 'The gold only, without the diamonds. Gold is priced on this.' : 'Without stones. Metal is priced on this.'">
                             <div class="relative">
-                                <input id="f-net" type="number" step="0.001" min="0" wire:model.live.debounce.400ms="net_weight" class="rj-input pr-9 tabular @error('net_weight') is-invalid @enderror">
+                                <input id="f-net" type="text" inputmode="decimal" autocomplete="off" wire:model.live.debounce.400ms="net_weight" class="rj-input pr-9 tabular @error('net_weight') is-invalid @enderror">
                                 <span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-[13px] text-ink_text-muted pointer-events-none">g</span>
                             </div>
                         </x-ui.field>
@@ -107,7 +107,7 @@
                         <x-ui.field :label="$isDiamond ? 'Diamond value' : 'Stone value'" for="f-stone-value" error="stone_value" optional>
                             <div class="relative">
                                 <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px] text-ink_text-muted pointer-events-none">₹</span>
-                                <input id="f-stone-value" type="number" step="0.01" min="0" wire:model.live.debounce.400ms="stone_value" class="rj-input pl-8 tabular @error('stone_value') is-invalid @enderror">
+                                <input id="f-stone-value" type="text" inputmode="decimal" autocomplete="off" wire:model.live.debounce.400ms="stone_value" class="rj-input pl-8 tabular @error('stone_value') is-invalid @enderror">
                             </div>
                         </x-ui.field>
                     </div>
@@ -121,7 +121,7 @@
                                 <input type="text" wire:model="charges.{{ $i }}.name" list="rj-charge-names" maxlength="60" placeholder="What for, e.g. Sakha" class="rj-input flex-1 @error('charges.' . $i . '.name') is-invalid @enderror" aria-label="Charge name" autocomplete="off">
                                 <div class="relative w-[140px]">
                                     <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px] text-ink_text-muted pointer-events-none">₹</span>
-                                    <input type="number" step="0.01" min="0" wire:model="charges.{{ $i }}.amount" class="rj-input pl-8 tabular @error('charges.' . $i . '.amount') is-invalid @enderror" aria-label="Charge amount">
+                                    <input type="text" inputmode="decimal" autocomplete="off" wire:model="charges.{{ $i }}.amount" class="rj-input pl-8 tabular @error('charges.' . $i . '.amount') is-invalid @enderror" aria-label="Charge amount">
                                 </div>
                                 <x-ui.button variant="ghost" size="icon-sm" icon="x" wire:click="removeCharge({{ $i }})" aria-label="Remove this charge" />
                             </div>
@@ -134,7 +134,7 @@
                         <x-ui.field label="MRP" for="f-mrp" error="mrp" class="mt-4" hint="A diamond piece is priced at its MRP alone. No daily rate applies.">
                             <div class="relative max-w-[240px]">
                                 <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px] text-ink_text-muted pointer-events-none">₹</span>
-                                <input id="f-mrp" type="number" step="0.01" min="0" wire:model.live.debounce.400ms="mrp" class="rj-input pl-8 tabular @error('mrp') is-invalid @enderror">
+                                <input id="f-mrp" type="text" inputmode="decimal" autocomplete="off" wire:model.live.debounce.400ms="mrp" class="rj-input pl-8 tabular @error('mrp') is-invalid @enderror">
                             </div>
                         </x-ui.field>
                     @endif
@@ -142,7 +142,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4 p-4 rounded-xl bg-gold-tint/40 ring-1 ring-inset ring-gold-soft/60">
                             <x-ui.field label="Diamond weight" for="f-dcarat" error="diamond_carat" optional>
                                 <div class="relative">
-                                    <input id="f-dcarat" type="number" step="0.001" min="0" wire:model="diamond_carat" class="rj-input pr-10 tabular @error('diamond_carat') is-invalid @enderror">
+                                    <input id="f-dcarat" type="text" inputmode="decimal" autocomplete="off" wire:model="diamond_carat" class="rj-input pr-10 tabular @error('diamond_carat') is-invalid @enderror">
                                     <span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-[13px] text-ink_text-muted pointer-events-none">ct</span>
                                 </div>
                             </x-ui.field>
@@ -182,7 +182,7 @@
                             @if ($making_type !== 'percentage')
                                 <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px] text-ink_text-muted pointer-events-none">₹</span>
                             @endif
-                            <input id="f-making" type="number" step="0.01" min="0" wire:model.live.debounce.400ms="making_value"
+                            <input id="f-making" type="text" inputmode="decimal" autocomplete="off" wire:model.live.debounce.400ms="making_value"
                                 class="rj-input tabular {{ $making_type !== 'percentage' ? 'pl-8' : '' }} pr-14 @error('making_value') is-invalid @enderror">
                             <span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-[12.5px] text-ink_text-muted pointer-events-none">
                                 {{ ['percentage' => '%', 'flat_per_piece' => '/ piece', 'flat_per_gram' => '/ gram'][$making_type] }}
@@ -235,7 +235,7 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 p-4 rounded-xl bg-surface-sunken ring-1 ring-inset ring-line-light">
                             <x-ui.field label="Other piece's weight" for="f-pw" error="partnerWeight">
                                 <div class="relative">
-                                    <input id="f-pw" type="number" step="0.001" min="0" wire:model="partnerWeight" class="rj-input pr-9 tabular @error('partnerWeight') is-invalid @enderror">
+                                    <input id="f-pw" type="text" inputmode="decimal" autocomplete="off" wire:model="partnerWeight" class="rj-input pr-9 tabular @error('partnerWeight') is-invalid @enderror">
                                     <span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-[13px] text-ink_text-muted">g</span>
                                 </div>
                             </x-ui.field>

@@ -28,7 +28,7 @@ class OrderDetail extends Component
 
         $this->validate([
             'advanceAmount' => ['required', 'numeric', 'min:0.01', 'max:99999999'],
-            'advanceMode' => ['required', 'in:' . implode(',', array_keys(OrderPayment::MODES))],
+            'advanceMode' => ['required', 'in:' . implode(',', array_keys(OrderPayment::NEW_MODES))],
             'advanceNote' => ['nullable', 'string', 'max:255'],
         ], [], ['advanceAmount' => 'amount']);
 

@@ -5,14 +5,14 @@
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <x-ui.field :label="$weightLabel" for="wf-returned" error="weightReturned">
             <div class="relative">
-                <input id="wf-returned" type="number" step="0.001" min="0" wire:model.live.debounce.500ms="weightReturned"
+                <input id="wf-returned" type="text" inputmode="decimal" autocomplete="off" wire:model.live.debounce.500ms="weightReturned"
                     class="rj-input pr-9 tabular @error('weightReturned') is-invalid @enderror">
                 <span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-[13px] text-ink_text-muted pointer-events-none">g</span>
             </div>
         </x-ui.field>
         <x-ui.field label="Weight loss" for="wf-loss" error="weightLoss" hint="Entered by hand. 0 if none.">
             <div class="relative">
-                <input id="wf-loss" type="number" step="0.001" min="0" wire:model="weightLoss"
+                <input id="wf-loss" type="text" inputmode="decimal" autocomplete="off" wire:model="weightLoss"
                     class="rj-input pr-9 tabular bg-gold-tint/40 border-gold-soft @error('weightLoss') is-invalid @enderror">
                 <span class="absolute right-3.5 top-1/2 -translate-y-1/2 text-[13px] text-ink_text-muted pointer-events-none">g</span>
             </div>

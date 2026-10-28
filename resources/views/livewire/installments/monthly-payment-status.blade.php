@@ -69,7 +69,7 @@
             @if ($paySchemeModel->next_due_on->lt(today()))
                 <p class="text-[13px] text-danger mb-3">This instalment is {{ (int) $paySchemeModel->next_due_on->diffInDays(today()) }} {{ \Illuminate\Support\Str::plural('day', (int) $paySchemeModel->next_due_on->diffInDays(today())) }} late.</p>
                 <x-ui.field label="Late fee (₹)" for="mp-late" error="lateFee" optional hint="Typed in by you, never worked out. Leave empty for none.">
-                    <input id="mp-late" type="number" step="0.01" min="0" wire:model="lateFee" class="rj-input tabular @error('lateFee') is-invalid @enderror" autofocus>
+                    <input id="mp-late" type="text" inputmode="decimal" autocomplete="off" wire:model="lateFee" class="rj-input tabular @error('lateFee') is-invalid @enderror" autofocus>
                 </x-ui.field>
             @else
                 <p class="text-[13px] text-ink_text-secondary">On time. No late fee.</p>

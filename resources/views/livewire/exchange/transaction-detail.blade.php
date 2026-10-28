@@ -51,7 +51,7 @@
 
         @can('exchange.manage')
             <x-ui.modal wire:model="showCash" title="Paid out in cash" icon="coins" max-width="sm" submit="payCash" subtitle="Records that the customer took this part of the value in cash. It leaves the credit.">
-                <x-ui.field label="Amount (₹)" for="ex-cash" error="cashAmount"><input id="ex-cash" type="number" step="0.01" min="0" wire:model="cashAmount" class="rj-input tabular @error('cashAmount') is-invalid @enderror" autofocus></x-ui.field>
+                <x-ui.field label="Amount (₹)" for="ex-cash" error="cashAmount"><input id="ex-cash" type="text" inputmode="decimal" autocomplete="off" wire:model="cashAmount" class="rj-input tabular @error('cashAmount') is-invalid @enderror" autofocus></x-ui.field>
                 <x-ui.field label="Note" for="ex-cash-note" optional class="mt-4"><input id="ex-cash-note" type="text" wire:model="cashNote" maxlength="255" class="rj-input"></x-ui.field>
                 <x-slot:footer>
                     <x-ui.button variant="secondary" x-on:click="show = false">Cancel</x-ui.button>

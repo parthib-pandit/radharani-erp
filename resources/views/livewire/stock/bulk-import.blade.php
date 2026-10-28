@@ -57,7 +57,7 @@
                 </ul>
                 <div class="flex flex-wrap items-end gap-2.5 mt-5">
                     <x-ui.field label="Pieces you will upload" for="tpl-count" class="w-[170px]">
-                        <input id="tpl-count" type="number" min="1" max="500" wire:model="templateCount" class="rj-input tabular" aria-label="Number of pieces">
+                        <input id="tpl-count" type="text" inputmode="numeric" autocomplete="off" wire:model="templateCount" class="rj-input tabular" aria-label="Number of pieces">
                     </x-ui.field>
                     <x-ui.button variant="soft" size="sm" icon="download" wire:click="downloadBlankTemplate">{{ $withCodes ? 'Download sheet with codes' : 'Download blank sheet' }}</x-ui.button>
                     <x-ui.button variant="ghost" size="sm" icon="download" wire:click="downloadTemplate">Sample sheet</x-ui.button>
@@ -117,7 +117,7 @@
                             </select>
                         </x-ui.field>
                         <x-ui.field label="Making value" for="d-mv" error="defaultMakingValue">
-                            <input id="d-mv" type="number" step="0.01" min="0" wire:model="defaultMakingValue" class="rj-input tabular">
+                            <input id="d-mv" type="text" inputmode="decimal" autocomplete="off" wire:model="defaultMakingValue" class="rj-input tabular">
                         </x-ui.field>
                     </div>
                     <div class="grid grid-cols-2 gap-3">

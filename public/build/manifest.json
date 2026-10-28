@@ -14,7 +14,7 @@
     "src": "public/fonts/Saudagar.woff2"
   },
   "resources/css/app.css": {
-    "file": "assets/app-CY0PnWOs.css",
+    "file": "assets/app-DymL3Fcl.css",
     "name": "app",
     "names": [
       "app.css"
@@ -27,7 +27,7 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-BtbIXbqK.js",
+    "file": "assets/app-BWadPhFp.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,

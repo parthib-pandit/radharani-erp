@@ -33,7 +33,7 @@ class InvoiceView extends Component
         abort_unless(Auth::user()?->can('sale.create'), 403);
         abort_if(Sale::findOrFail($this->sale->id)->isCancelled(), 422, 'This sale is cancelled.');
         $this->validate([
-            'mode' => ['required', 'in:cash,upi,card,bank'],
+            'mode' => ['required', 'in:' . implode(',', array_keys(SalePayment::NEW_MODES))],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'note' => ['nullable', 'string', 'max:255'],
         ]);

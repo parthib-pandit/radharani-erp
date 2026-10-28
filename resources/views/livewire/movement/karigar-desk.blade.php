@@ -70,8 +70,8 @@
                         @forelse ($lines as $i => $l)
                             <div class="flex flex-wrap gap-2 mb-2" wire:key="kl-{{ $i }}">
                                 <input type="text" wire:model.live.debounce.300ms="lines.{{ $i }}.description" maxlength="150" placeholder="Describe the item" class="rj-input flex-1 min-w-[180px] @error('lines.' . $i . '.description') is-invalid @enderror" aria-label="Item">
-                                <input type="number" min="1" wire:model.live.debounce.300ms="lines.{{ $i }}.pieces" class="rj-input tabular w-[80px] @error('lines.' . $i . '.pieces') is-invalid @enderror" aria-label="Pieces" title="Pieces">
-                                <input type="number" step="0.001" min="0" wire:model.live.debounce.300ms="lines.{{ $i }}.weight" placeholder="g" class="rj-input tabular w-[110px] @error('lines.' . $i . '.weight') is-invalid @enderror" aria-label="Weight in grams">
+                                <input type="text" inputmode="numeric" autocomplete="off" wire:model.live.debounce.300ms="lines.{{ $i }}.pieces" class="rj-input tabular w-[80px] @error('lines.' . $i . '.pieces') is-invalid @enderror" aria-label="Pieces" title="Pieces">
+                                <input type="text" inputmode="decimal" autocomplete="off" wire:model.live.debounce.300ms="lines.{{ $i }}.weight" placeholder="g" class="rj-input tabular w-[110px] @error('lines.' . $i . '.weight') is-invalid @enderror" aria-label="Weight in grams">
                                 <x-ui.button type="button" variant="ghost" size="icon-sm" icon="x" wire:click="removeLine({{ $i }})" aria-label="Remove item" />
                             </div>
                             @error('lines.' . $i . '.description')<p class="rj-error">{{ $message }}</p>@enderror
@@ -83,10 +83,10 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <x-ui.field label="Pieces expected" for="ki-pieces" error="piecesExpected">
-                            <input id="ki-pieces" type="number" min="1" wire:model="piecesExpected" @readonly($lines) class="rj-input tabular @error('piecesExpected') is-invalid @enderror">
+                            <input id="ki-pieces" type="text" inputmode="numeric" autocomplete="off" wire:model="piecesExpected" @readonly($lines) class="rj-input tabular @error('piecesExpected') is-invalid @enderror">
                         </x-ui.field>
                         <x-ui.field label="Estimated weight (g)" for="ki-weight" error="estimatedWeight" :hint="$lines ? 'Added up from the items.' : null">
-                            <input id="ki-weight" type="number" step="0.001" min="0" wire:model="estimatedWeight" @readonly($lines) class="rj-input tabular @error('estimatedWeight') is-invalid @enderror">
+                            <input id="ki-weight" type="text" inputmode="decimal" autocomplete="off" wire:model="estimatedWeight" @readonly($lines) class="rj-input tabular @error('estimatedWeight') is-invalid @enderror">
                         </x-ui.field>
                         <x-ui.field label="Expected back" for="ki-date" error="expectedReturn">
                             <input id="ki-date" type="date" min="{{ today()->toDateString() }}" wire:model="expectedReturn" class="rj-input">
@@ -98,10 +98,10 @@
                         @if ($withAdvance)
                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
                                 <x-ui.field label="Cash (₹)" for="ki-cash" error="advanceCash" optional>
-                                    <input id="ki-cash" type="number" step="0.01" min="0" wire:model="advanceCash" class="rj-input tabular @error('advanceCash') is-invalid @enderror">
+                                    <input id="ki-cash" type="text" inputmode="decimal" autocomplete="off" wire:model="advanceCash" class="rj-input tabular @error('advanceCash') is-invalid @enderror">
                                 </x-ui.field>
                                 <x-ui.field label="Metal (g)" for="ki-am" error="advanceMetalWeight" optional>
-                                    <input id="ki-am" type="number" step="0.001" min="0" wire:model="advanceMetalWeight" class="rj-input tabular @error('advanceMetalWeight') is-invalid @enderror">
+                                    <input id="ki-am" type="text" inputmode="decimal" autocomplete="off" wire:model="advanceMetalWeight" class="rj-input tabular @error('advanceMetalWeight') is-invalid @enderror">
                                 </x-ui.field>
                                 <x-ui.field label="Carat" for="ki-ap" error="advanceMetalPurity">
                                     <select id="ki-ap" wire:model="advanceMetalPurity" class="rj-select">
@@ -192,14 +192,14 @@
                             <p class="text-[12.5px] text-ink_text-secondary -mt-3">{{ $n }} {{ \Illuminate\Support\Str::plural('piece', $n) }} entered · {{ $batch->pieces_pending }} still expected</p>
                         @else
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <x-ui.field label="Pieces" for="kr-hp" error="hallmarkPieces"><input id="kr-hp" type="number" min="1" wire:model="hallmarkPieces" class="rj-input tabular"></x-ui.field>
-                                <x-ui.field label="Total weight (g)" for="kr-hw" error="hallmarkWeight"><input id="kr-hw" type="number" step="0.001" min="0" wire:model="hallmarkWeight" class="rj-input tabular"></x-ui.field>
+                                <x-ui.field label="Pieces" for="kr-hp" error="hallmarkPieces"><input id="kr-hp" type="text" inputmode="numeric" autocomplete="off" wire:model="hallmarkPieces" class="rj-input tabular"></x-ui.field>
+                                <x-ui.field label="Total weight (g)" for="kr-hw" error="hallmarkWeight"><input id="kr-hw" type="text" inputmode="decimal" autocomplete="off" wire:model="hallmarkWeight" class="rj-input tabular"></x-ui.field>
                             </div>
                             <p class="rj-help -mt-2">They go to hallmarking untagged and are not made into pieces until they come back.</p>
                         @endif
 
                         <x-ui.field label="Weight loss (g)" for="kr-loss" error="lossWeight" optional hint="Typed in by you, never worked out.">
-                            <input id="kr-loss" type="number" step="0.001" min="0" wire:model="lossWeight" class="rj-input tabular">
+                            <input id="kr-loss" type="text" inputmode="decimal" autocomplete="off" wire:model="lossWeight" class="rj-input tabular">
                         </x-ui.field>
                         <x-ui.field label="Note" for="kr-note" optional><input id="kr-note" type="text" wire:model="receiveNote" maxlength="255" class="rj-input"></x-ui.field>
                         <x-movement.photo-upload :photo="$photo" required label="Photo of what came back" />
@@ -239,12 +239,12 @@
                     </div>
                     <div class="rj-segment"><button type="button" wire:click="$set('payKind', 'cash')" class="{{ $payKind === 'cash' ? 'is-active' : '' }}">Cash</button><button type="button" wire:click="$set('payKind', 'metal')" class="{{ $payKind === 'metal' ? 'is-active' : '' }}">Metal</button></div>
                     @if ($payKind === 'cash')
-                        <x-ui.field label="Amount (₹)" for="kp-a" error="payAmount"><input id="kp-a" type="number" step="0.01" min="0" wire:model="payAmount" class="rj-input tabular"></x-ui.field>
+                        <x-ui.field label="Amount (₹)" for="kp-a" error="payAmount"><input id="kp-a" type="text" inputmode="decimal" autocomplete="off" wire:model="payAmount" class="rj-input tabular"></x-ui.field>
                     @else
                         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             <x-ui.field label="Metal" for="kp-m"><select id="kp-m" wire:model.live="payMetal" class="rj-select">@foreach ($metals as $k => $v)<option value="{{ $k }}">{{ $v }}</option>@endforeach</select></x-ui.field>
                             <x-ui.field label="Carat" for="kp-p" error="payPurity"><select id="kp-p" wire:model="payPurity" class="rj-select">@foreach ($purities[$payMetal] ?? [] as $p)<option value="{{ $p }}">{{ $p }}</option>@endforeach</select></x-ui.field>
-                            <x-ui.field label="Weight (g)" for="kp-w" error="payWeight"><input id="kp-w" type="number" step="0.001" min="0" wire:model="payWeight" class="rj-input tabular"></x-ui.field>
+                            <x-ui.field label="Weight (g)" for="kp-w" error="payWeight"><input id="kp-w" type="text" inputmode="decimal" autocomplete="off" wire:model="payWeight" class="rj-input tabular"></x-ui.field>
                         </div>
                     @endif
                     <x-ui.field label="Note" for="kp-n" optional><input id="kp-n" type="text" wire:model="payNote" maxlength="255" class="rj-input"></x-ui.field>

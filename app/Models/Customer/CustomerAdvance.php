@@ -9,6 +9,9 @@ class CustomerAdvance extends Model
 {
     public const MODES = ['cash' => 'Cash', 'upi' => 'UPI', 'card' => 'Card', 'bank' => 'Bank', 'cheque' => 'Cheque'];
 
+    /** What a new advance can be paid in by (28 Oct): cash or bank. The others stay so older advances still read. */
+    public const NEW_MODES = ['cash' => 'Cash', 'bank' => 'Bank'];
+
     public $timestamps = false;
 
     protected $casts = ['created_at' => 'datetime'];

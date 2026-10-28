@@ -50,7 +50,7 @@
                         <td>{{ $w['sale']->referrer?->name }}</td>
                         <td class="tabular">{{ number_format($w['grams'], 3) }}</td>
                         <td class="tabular">{{ $w['suggested'] }}</td>
-                        <td><input type="number" min="0" wire:model="waitingPoints.{{ $w['sale']->id }}" placeholder="{{ $w['suggested'] }}" class="rj-input tabular w-[110px] @error('waitingPoints.' . $w['sale']->id) is-invalid @enderror" aria-label="Points"></td>
+                        <td><input type="text" inputmode="numeric" autocomplete="off" wire:model="waitingPoints.{{ $w['sale']->id }}" placeholder="{{ $w['suggested'] }}" class="rj-input tabular w-[110px] @error('waitingPoints.' . $w['sale']->id) is-invalid @enderror" aria-label="Points"></td>
                         <td class="text-right"><x-ui.button size="sm" icon="check" wire:click="award({{ $w['sale']->id }})" target="award">Award</x-ui.button></td>
                     </tr>
                 @empty
@@ -73,7 +73,7 @@
             <x-ui.card title="Add or take off points" icon="plus">
                 <form wire:submit="awardManual" class="space-y-3">
                     <x-ui.field label="Customer" for="rp-c" error="awardCustomerId"><select id="rp-c" wire:model="awardCustomerId" class="rj-select"><option value="">Choose...</option>@foreach ($members as $m)<option value="{{ $m->id }}">{{ $m->name }}</option>@endforeach</select></x-ui.field>
-                    <x-ui.field label="Points" for="rp-p" error="awardPoints" hint="Use a minus to take points off."><input id="rp-p" type="number" wire:model="awardPoints" class="rj-input tabular"></x-ui.field>
+                    <x-ui.field label="Points" for="rp-p" error="awardPoints" hint="Use a minus to take points off."><input id="rp-p" type="text" inputmode="numeric" data-signed autocomplete="off" wire:model="awardPoints" class="rj-input tabular"></x-ui.field>
                     <x-ui.field label="Note" for="rp-n" optional><input id="rp-n" type="text" wire:model="awardNote" maxlength="255" class="rj-input"></x-ui.field>
                     <x-ui.button type="submit" icon="check" target="awardManual">Record</x-ui.button>
                 </form>
@@ -84,8 +84,8 @@
     @if ($tab === 'rules')
         <x-ui.card title="How points are worked out" subtitle="Set by the owner. They are suggestions on the waiting list until staff award them." icon="scale" class="max-w-[620px]">
             <form wire:submit="saveRules" class="space-y-4">
-                <x-ui.field label="Points per gram" for="rr-g" error="pointsPerGram" hint="For each gram of metal the referred customer buys."><input id="rr-g" type="number" step="0.01" min="0" wire:model="pointsPerGram" class="rj-input tabular max-w-[200px]" @disabled(! $canSetRules)></x-ui.field>
-                <x-ui.field label="Bonus on their first sale" for="rr-b" error="firstSaleBonus" hint="Flat points on top, once, for the referred customer's first verified sale."><input id="rr-b" type="number" min="0" wire:model="firstSaleBonus" class="rj-input tabular max-w-[200px]" @disabled(! $canSetRules)></x-ui.field>
+                <x-ui.field label="Points per gram" for="rr-g" error="pointsPerGram" hint="For each gram of metal the referred customer buys."><input id="rr-g" type="text" inputmode="decimal" autocomplete="off" wire:model="pointsPerGram" class="rj-input tabular max-w-[200px]" @disabled(! $canSetRules)></x-ui.field>
+                <x-ui.field label="Bonus on their first sale" for="rr-b" error="firstSaleBonus" hint="Flat points on top, once, for the referred customer's first verified sale."><input id="rr-b" type="text" inputmode="numeric" autocomplete="off" wire:model="firstSaleBonus" class="rj-input tabular max-w-[200px]" @disabled(! $canSetRules)></x-ui.field>
                 @if ($canSetRules)<x-ui.button type="submit" icon="check" target="saveRules">Save rules</x-ui.button>@else<p class="rj-help">Only the owner can change the rules.</p>@endif
             </form>
         </x-ui.card>

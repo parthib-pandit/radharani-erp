@@ -65,7 +65,7 @@
                     <x-ui.field label="Gross weight, as received" for="ne-gross" error="grossWeight" hint="Grams, before anything is melted">
                         <div class="rj-input-icon">
                             <x-ui.icon name="scale" :size="16" />
-                            <input id="ne-gross" type="number" step="0.001" min="0" wire:model="grossWeight" class="rj-input tabular">
+                            <input id="ne-gross" type="text" inputmode="decimal" autocomplete="off" wire:model="grossWeight" class="rj-input tabular">
                         </div>
                     </x-ui.field>
                     <x-ui.field label="Description" for="ne-desc" optional>
@@ -94,7 +94,7 @@
                 <x-ui.field label="Net weight, after melting" for="ne-net" error="netWeight" hint="The shop's own measurement is authoritative">
                     <div class="rj-input-icon">
                         <x-ui.icon name="scale" :size="16" />
-                        <input id="ne-net" type="number" step="0.001" min="0" wire:model="netWeight" class="rj-input tabular">
+                        <input id="ne-net" type="text" inputmode="decimal" autocomplete="off" wire:model="netWeight" class="rj-input tabular">
                     </div>
                 </x-ui.field>
 
@@ -118,13 +118,13 @@
                     <x-ui.field label="Test 1" for="ne-p1" error="purityTest1">
                         <div class="rj-input-icon">
                             <x-ui.icon name="percent" :size="16" />
-                            <input id="ne-p1" type="number" step="0.01" min="0" max="100" wire:model.live="purityTest1" class="rj-input tabular">
+                            <input id="ne-p1" type="text" inputmode="decimal" autocomplete="off" wire:model.live="purityTest1" class="rj-input tabular">
                         </div>
                     </x-ui.field>
                     <x-ui.field label="Test 2" for="ne-p2" error="purityTest2">
                         <div class="rj-input-icon">
                             <x-ui.icon name="percent" :size="16" />
-                            <input id="ne-p2" type="number" step="0.01" min="0" max="100" wire:model.live="purityTest2" class="rj-input tabular">
+                            <input id="ne-p2" type="text" inputmode="decimal" autocomplete="off" wire:model.live="purityTest2" class="rj-input tabular">
                         </div>
                     </x-ui.field>
                 </div>
