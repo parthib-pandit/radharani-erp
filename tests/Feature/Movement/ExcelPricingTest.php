@@ -173,10 +173,10 @@ class ExcelPricingTest extends TestCase
         Movement::create(['trackable_type' => 'item', 'trackable_id' => $piece->id, 'movement_type' => 'vault_out', 'user_id' => $this->user->id]);
         $customer = Customer::create(['name' => 'Sheet Customer', 'phone' => (string) random_int(6000000000, 9999999999)]);
 
-        $c = Livewire::test(NewSale::class)->set('customerId', $customer->id)->call('next')->call('addItem', $piece->id)
+        $c = Livewire::test(NewSale::class)->set('customerId', $customer->id)->call('addItem', $piece->id)
             ->call('next')->set('extras', [['name' => 'Packing', 'amount' => '50']]);
         // 12,038.15 + 50 = 12,088.15 -> 12,088 with the round-off of -0.15; a final price of 12,000 is a discount of 88 after it
-        $c->set('finalType', 'final')->set('finalValue', '12000')->call('next');
+        $c->set('finalType', 'final')->set('finalValue', '12000')->call('next')->call('next');
         $this->assertEquals(12000, $c->get('total'));
         $this->assertEqualsWithDelta(12000, collect($c->get('payments'))->sum(fn ($p) => (float) $p['amount']), 0.005, 'the payment line follows the discount');
 

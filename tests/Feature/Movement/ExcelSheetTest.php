@@ -119,8 +119,8 @@ class ExcelSheetTest extends TestCase
         $item = $this->piece('gold', '22K', 3.36, 'percentage', 20, true);
         $customer = Customer::create(['name' => 'Sheet Customer', 'phone' => (string) random_int(6000000000, 9999999999)]);
 
-        $c = Livewire::test(NewSale::class)->set('customerId', $customer->id)->call('next')->call('addItem', $item->id)
-            ->call('next')->set('extras', [['name' => 'Sakha', 'amount' => '250']])->set('finalValue', '141')->call('next');
+        $c = Livewire::test(NewSale::class)->set('customerId', $customer->id)->call('addItem', $item->id)
+            ->call('next')->set('extras', [['name' => 'Sakha', 'amount' => '250']])->set('finalValue', '141')->call('next')->call('next');
         $this->assertEquals(60000, $c->get('total'));
         $c->call('next')->call('submit')->assertHasNoErrors();
 

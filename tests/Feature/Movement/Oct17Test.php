@@ -182,7 +182,7 @@ class Oct17Test extends TestCase
         $piece = Item::create(['packet_id' => $this->packetId(), 'internal_code' => 'AD' . random_int(100, 999), 'metal' => 'gold', 'category' => 'Ring', 'purity' => '9K', 'making_value' => 0, 'weight' => 5, 'status' => 'in_stock']);
         Movement::create(['trackable_type' => 'item', 'trackable_id' => $piece->id, 'movement_type' => 'vault_out', 'user_id' => $this->user->id]);
 
-        $c = Livewire::test(NewSale::class)->set('customerId', $customer->id)->call('next')->call('addItem', $piece->id)->call('next')->call('next');
+        $c = Livewire::test(NewSale::class)->set('customerId', $customer->id)->call('addItem', $piece->id)->call('next')->call('next')->call('next');
         $c->call('useAdvance');
         $this->assertSame('advance', $c->get('payments')[0]['mode']);
         $this->assertEquals(4000, (float) $c->get('payments')[0]['amount']);
@@ -251,6 +251,6 @@ class Oct17Test extends TestCase
         $tx = \App\Models\Exchange\ExchangeTransaction::where('customer_id', $customer->id)->firstOrFail();
         $this->assertLessThan(2.1, $tx->payablePureWeight(), '3.41 g at 60% is about 2 g of pure metal, not 3.41 g');
 
-        Livewire::withQueryParams(['exchange' => $tx->id])->test(NewSale::class)->assertSet('customerId', $customer->id)->assertSet('step', 2);
+        Livewire::withQueryParams(['exchange' => $tx->id])->test(NewSale::class)->assertSet('customerId', $customer->id)->assertSet('step', 1);
     }
 }

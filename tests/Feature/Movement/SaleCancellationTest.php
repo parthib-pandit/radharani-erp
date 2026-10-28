@@ -65,8 +65,8 @@ class SaleCancellationTest extends TestCase
     /** A saved sale made through the real form, paid in part in cash. */
     private function sale(Item $item, float $cash = 2000): Sale
     {
-        $c = Livewire::test(NewSale::class)->set('customerId', $this->customer->id)->call('next')->call('addItem', $item->id)
-            ->call('next')->call('next')->set('payments', [['mode' => 'cash', 'amount' => (string) $cash]])->call('next')->call('submit')->assertHasNoErrors();
+        $c = Livewire::test(NewSale::class)->set('customerId', $this->customer->id)->call('addItem', $item->id)
+            ->call('next')->call('next')->call('next')->set('payments', [['mode' => 'cash', 'amount' => (string) $cash]])->call('next')->call('submit')->assertHasNoErrors();
 
         return Sale::where('customer_id', $this->customer->id)->latest('id')->firstOrFail();
     }
@@ -176,7 +176,7 @@ class SaleCancellationTest extends TestCase
     {
         $before = Sale::count();
 
-        Livewire::test(NewSale::class)->set('customerId', $this->customer->id)->call('next')->call('addItem', $this->piece()->id)
+        Livewire::test(NewSale::class)->set('customerId', $this->customer->id)->call('addItem', $this->piece()->id)
             ->call('cancelDraft')->assertRedirect(route('sales.history'));
 
         $this->assertSame($before, Sale::count());
