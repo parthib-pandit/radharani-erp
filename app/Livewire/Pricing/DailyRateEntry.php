@@ -16,6 +16,9 @@ class DailyRateEntry extends Component
 {
     public const METALS = ['gold', 'silver'];
 
+    // Shown inside the dashboard (28 Oct), without the page's own heading.
+    public bool $embedded = false;
+
     /** @var array<string, array<string, string>> metal => carat => rate as typed */
     public array $rates = [];
 
@@ -28,8 +31,9 @@ class DailyRateEntry extends Component
         return str_replace(['.', ' '], '_', $carat);
     }
 
-    public function mount(): void
+    public function mount(bool $embedded = false): void
     {
+        $this->embedded = $embedded;
         foreach (RateLog::rateCarats() as $metal => $carats) {
             foreach ($carats as $carat) {
                 $log = RateLog::latestFor($metal, $carat);
@@ -80,6 +84,7 @@ class DailyRateEntry extends Component
             }
         }
 
+        $this->dispatch('rates-updated');
         $this->dispatch('toast', message: $saved ? "{$saved} " . \Illuminate\Support\Str::plural('rate', $saved) . ' saved.' : 'No rates changed.', type: $saved ? 'success' : 'info');
         if ($warning = $this->zeroRateWarning()) {
             $this->dispatch('toast', message: $warning, type: 'warning');

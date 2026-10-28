@@ -12,44 +12,32 @@ $toneIcon = [
 ];
 $urgent = collect($attention)->where('tone', 'danger')->count();
 @endphp
-<div class="space-y-6">
+<div class="space-y-6" x-data="{ rates: false }">
 
-    {{-- Hero: greeting, what needs doing, today's rates --}}
+    {{-- Hero: the greeting and today's rates. Anyone who can set the rates updates them right here. --}}
     <section class="relative overflow-hidden rounded-[18px] bg-ink ink-grain text-ink-fg shadow-raised animate-rise-in">
         <div aria-hidden="true" class="pointer-events-none absolute -right-24 -top-24 w-[380px] h-[380px] rounded-full border border-gold/10"></div>
         <div aria-hidden="true" class="pointer-events-none absolute -right-10 -top-10 w-[240px] h-[240px] rounded-full border border-gold/10"></div>
 
         <div class="relative flex flex-col xl:flex-row xl:items-end justify-between gap-6 p-6 sm:p-7 lg:p-8">
-            <div class="min-w-0">
-                <div class="text-[11px] font-semibold tracking-[0.2em] uppercase text-gold-light/80">{{ now()->format('l, j F Y') }}</div>
-                <h1 class="font-display text-[34px] sm:text-[40px] leading-[1.05] font-semibold text-white mt-2">{{ $greeting }}</h1>
-                <p class="text-[13.5px] text-ink-fg mt-2 max-w-[60ch]">
-                    @if (count($attention) === 0)
-                        Everything is up to date. Nothing is waiting on you right now.
-                    @else
-                        {{ count($attention) }} {{ count($attention) === 1 ? 'thing needs' : 'things need' }} your attention{!! $urgent ? ', <span class="text-[#F2A0A0]">' . $urgent . ' urgent</span>' : '' !!}.
-                        <a href="#attention" class="text-gold-light hover:text-white underline decoration-gold/40 underline-offset-4">See the list</a>
-                    @endif
-                </p>
-            </div>
+            <h1 class="font-display text-[34px] sm:text-[40px] leading-[1.05] font-semibold text-white min-w-0">{{ $greeting }}</h1>
 
             @if ($rates->isNotEmpty())
                 <div class="shrink-0">
-                    <div class="flex items-center justify-between gap-4 mb-2.5">
+                    <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mb-2.5">
                         <span class="text-[11px] font-semibold tracking-[0.16em] uppercase text-ink-dim">Today's rates · per gram</span>
-                        @if ($ratesStale)
-                            @if ($canRates)
-                                <a href="{{ route('pricing.rates') }}" class="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-warning/20 text-gold-light text-[11px] font-bold hover:bg-warning/30">
-                                    <x-ui.icon name="alert-triangle" :size="12" /> Not updated today
-                                </a>
+                        <span class="flex items-center gap-2 whitespace-nowrap">
+                            @if ($ratesStale)
+                                <span class="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-warning/20 text-gold-light text-[11px] font-bold whitespace-nowrap"><x-ui.icon name="alert-triangle" :size="12" /> Not updated today</span>
                             @else
-                                <span class="inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-warning/20 text-gold-light text-[11px] font-bold">
-                                    <x-ui.icon name="alert-triangle" :size="12" /> Not updated today
-                                </span>
+                                <span class="text-[11px] text-ink-dim">Set {{ $rates->first()['at']->format('g:i a') }}</span>
                             @endif
-                        @else
-                            <span class="text-[11px] text-ink-dim">Set {{ $rates->first()['at']->format('g:i a') }}</span>
-                        @endif
+                            @if ($canRates)
+                                <button type="button" x-on:click="rates = ! rates" class="press inline-flex items-center gap-1.5 h-6 px-2.5 rounded-full bg-gold/20 text-gold-light text-[11px] font-bold hover:bg-gold/30 whitespace-nowrap">
+                                    <x-ui.icon name="coins" :size="12" /> <span x-text="rates ? 'Close' : 'Update rates'">Update rates</span>
+                                </button>
+                            @endif
+                        </span>
                     </div>
                     <div class="grid grid-cols-2 sm:grid-cols-4 gap-px rounded-xl overflow-hidden bg-ink-line/80 ring-1 ring-ink-line">
                         @foreach ($rates as $r)
@@ -74,30 +62,33 @@ $urgent = collect($attention)->where('tone', 'danger')->count();
                     </div>
                 </div>
             @elseif ($canRates)
-                <x-ui.button variant="primary" icon="coins" :href="route('pricing.rates')">Enter today's rates</x-ui.button>
+                <button type="button" x-on:click="rates = true" class="press inline-flex items-center gap-2 h-10 px-4 rounded-control gold-sheen text-white text-[13px] font-semibold shadow-gold"><x-ui.icon name="coins" :size="15" /> Enter today's rates</button>
             @endif
         </div>
     </section>
 
-    {{-- Quick actions --}}
-    @php
-        // Literal class names so Tailwind emits them; one row on wide screens whatever the user can see.
-        $actionCols = 'sm:grid-cols-4 xl:grid-cols-6';
-    @endphp
-    <nav aria-label="Quick actions" class="grid grid-cols-2 {{ $actionCols }} gap-3">
+    @if ($canRates)
+        {{-- The rate update, in place: the same entry as Pricing & Rates, shown or hidden here --}}
+        <div x-show="rates" x-cloak x-transition.opacity>
+            <livewire:pricing.daily-rate-entry :embedded="true" />
+        </div>
+    @endif
+
+    {{-- The few tiles that matter most --}}
+    <nav aria-label="Quick actions" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         @foreach ($actions as $a)
-            @php $tileClass = 'press group flex items-center xl:flex-col xl:items-start gap-3 bg-white border border-line-light rounded-card shadow-card px-4 py-3.5 text-left transition-[border-color,box-shadow] duration-200 hover:border-gold-soft hover:shadow-raised'; @endphp
+            @php $tileClass = 'press group flex flex-col items-center justify-center gap-2.5 text-center bg-white border border-line-light rounded-card shadow-card px-3 py-5 min-h-[112px] transition-[border-color,box-shadow] duration-200 hover:border-gold-soft hover:shadow-raised'; @endphp
             @if (! empty($a['scan']))
                 <button type="button" x-on:click="$dispatch('rj-scan', { mode: 'go' })" class="{{ $tileClass }}">
             @else
                 <a href="{{ $a['href'] }}" class="{{ $tileClass }}">
             @endif
-                <span class="w-9 h-9 shrink-0 rounded-[10px] flex items-center justify-center transition-colors {{ $loop->first ? 'gold-sheen text-white shadow-gold' : 'bg-gold-tint text-gold-dark ring-1 ring-inset ring-gold-soft/60 group-hover:bg-[#F6EAD0]' }}">
-                    <x-ui.icon :name="$a['icon']" :size="16" />
+                <span class="w-12 h-12 shrink-0 rounded-2xl flex items-center justify-center transition-colors {{ $loop->first ? 'gold-sheen text-white shadow-gold' : 'bg-gold-tint text-gold-dark ring-1 ring-inset ring-gold-soft/60 group-hover:bg-[#F6EAD0]' }}">
+                    <x-ui.icon :name="$a['icon']" :size="22" />
                 </span>
-                <span class="text-[13px] font-semibold text-ink_text-primary leading-tight">{{ $a['label'] }}</span>
-                @if (isset($a['count']))
-                    <span class="ml-auto xl:ml-0 text-[11.5px] font-semibold tabular {{ $a['count'] ? 'text-gold-dark' : 'text-ink_text-muted' }}">{{ $a['count'] }} today</span>
+                <span class="text-[13.5px] font-semibold text-ink_text-primary leading-tight">{{ $a['label'] }}</span>
+                @if (isset($a['count']) && $a['count'])
+                    <span class="text-[11.5px] font-semibold tabular text-gold-dark">{{ $a['count'] }} today</span>
                 @endif
             @if (! empty($a['scan']))
                 </button>
@@ -106,6 +97,11 @@ $urgent = collect($attention)->where('tone', 'danger')->count();
             @endif
         @endforeach
     </nav>
+
+    @if ($canSimulate)
+        {{-- The price simulator, with the making charge slider --}}
+        <livewire:pricing.price-simulator :embedded="true" />
+    @endif
 
     {{-- Headline figures --}}
     <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

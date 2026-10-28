@@ -18,6 +18,7 @@ use App\Support\Trackables;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 /**
@@ -39,6 +40,12 @@ class Dashboard extends Component
         'melt' => 'At melting',
     ];
 
+    // The rate update panel in the hero saves its own rates; this redraws the hero's figures afterwards.
+    #[On('rates-updated')]
+    public function ratesUpdated(): void
+    {
+    }
+
     public function render()
     {
         $user = auth()->user();
@@ -53,6 +60,7 @@ class Dashboard extends Component
             'rates' => $rates,
             'ratesStale' => $rates->isNotEmpty() && ! $rates->first()['at']?->isToday(),
             'canRates' => $can('rate.update') && Route::has('pricing.rates'),
+            'canSimulate' => $can('rate.update', 'sale.create'),
             'stock' => $stock,
             'attention' => $attention,
             'pipeline' => $this->pipeline($can),
@@ -354,40 +362,16 @@ class Dashboard extends Component
             ->groupBy('movement_type')->pluck('n', 'movement_type');
         $sum = fn (string ...$types) => (int) collect($types)->sum(fn ($t) => $moves[$t] ?? 0);
 
+        // The few that matter most, like the tiles on a payment app's home screen (28 Oct). Everything else is in the sidebar.
         return collect([
             ['route' => 'sales.new', 'label' => 'New sale', 'icon' => 'receipt', 'can' => 'sale.create',
                 'count' => Sale::notCancelled()->whereDate('created_at', today())->count()],
+            ['route' => 'exchange.new', 'label' => 'New exchange', 'icon' => 'flame', 'can' => 'exchange.manage',
+                'count' => ExchangeTransaction::whereDate('created_at', today())->count()],
             ['scan' => true, 'label' => 'Scan a tag', 'icon' => 'scan'],
             ['route' => 'movements.vault-counter', 'label' => 'Vault ↔ Counter', 'icon' => 'repeat',
                 'count' => $sum('vault_out', 'vault_in')],
-            ['route' => 'movements.karigar', 'label' => 'Karigar issue', 'icon' => 'truck',
-                'params' => ['tab' => 'issue'], 'count' => KarigarRawBatch::whereDate('created_at', today())->count()],
-            ['route' => 'movements.karigar', 'label' => 'Karigar receive', 'icon' => 'package',
-                'params' => ['tab' => 'receive'], 'count' => \App\Models\Movement\KarigarReceipt::whereDate('created_at', today())->count()],
-            ['route' => 'movements.karigar', 'label' => 'Karigar payment', 'icon' => 'coins',
-                'params' => ['tab' => 'payments'], 'count' => \App\Models\Movement\KarigarPayment::whereDate('created_at', today())->where('kind', 'cash')->count()],
-            ['route' => 'movements.karigar', 'label' => 'Metal payment', 'icon' => 'scale',
-                'params' => ['tab' => 'payments'], 'count' => \App\Models\Movement\KarigarPayment::whereDate('created_at', today())->where('kind', 'metal')->count()],
-            ['route' => 'movements.hallmark', 'label' => 'Hallmark send', 'icon' => 'truck',
-                'params' => ['tab' => 'dispatch'], 'count' => \App\Models\Movement\HallmarkBatch::whereDate('created_at', today())->count()],
-            ['route' => 'movements.hallmark', 'label' => 'Hallmark receive', 'icon' => 'package',
-                'params' => ['tab' => 'receive'], 'count' => \App\Models\Movement\HallmarkReceipt::whereDate('created_at', today())->count()],
-            ['route' => 'ledgers.index', 'label' => 'Karigar ledger', 'icon' => 'book', 'params' => ['kind' => 'karigar'], 'can' => 'movement.create'],
-            ['route' => 'ledgers.index', 'label' => 'Hallmarker ledger', 'icon' => 'book', 'params' => ['kind' => 'hallmarker'], 'can' => 'movement.create'],
-            ['route' => 'movements.custom-purpose', 'label' => 'Photo / other purpose', 'icon' => 'camera',
-                'count' => $sum('photo_out', 'photo_in', 'custom_out', 'custom_in')],
-            ['route' => 'movements.pending-review', 'label' => 'Pending review', 'icon' => 'user-check', 'can' => 'movement.approve'],
-            ['route' => 'orders.new', 'label' => 'New order', 'icon' => 'clipboard', 'can' => 'orders.manage',
-                'count' => Order::whereDate('created_at', today())->count()],
-            ['route' => 'exchange.new', 'label' => 'Old gold exchange', 'icon' => 'flame', 'can' => 'exchange.manage',
-                'count' => ExchangeTransaction::whereDate('created_at', today())->count()],
-            ['route' => 'exchange.refinery.send', 'label' => 'Refinery send', 'icon' => 'flame', 'can' => 'exchange.manage',
-                'count' => RefineryBatch::whereDate('sent_at', today())->count()],
-            ['route' => 'exchange.refinery.return', 'label' => 'Refinery receive', 'icon' => 'flame', 'can' => 'exchange.manage',
-                'count' => RefineryBatch::whereDate('returned_at', today())->count()],
-            ['route' => 'purchases.new', 'label' => 'Raw-material purchase', 'icon' => 'cart', 'can' => 'purchase.manage'],
-            ['route' => 'pricing.rates', 'label' => 'Daily rates', 'icon' => 'coins', 'can' => 'rate.update'],
-            ['route' => 'stock.items', 'label' => 'Inventory', 'icon' => 'gem', 'can' => 'stock.manage'],
+            ['route' => 'installments.monthly-status', 'label' => 'Monthly scheme', 'icon' => 'calendar', 'can' => 'customer.manage'],
         ])
             ->filter(fn ($a) => (empty($a['can']) || $can($a['can'])) && (! empty($a['scan']) || Route::has($a['route'])))
             ->map(fn ($a) => $a + ['href' => isset($a['route']) ? route($a['route'], $a['params'] ?? []) : null])

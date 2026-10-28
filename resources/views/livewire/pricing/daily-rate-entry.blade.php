@@ -1,10 +1,17 @@
 <div>
+    @if ($embedded)
+        <div class="flex items-center justify-between gap-3 mb-3">
+            <h2 class="font-display text-[24px] leading-tight font-semibold text-ink_text-primary">Today's rates</h2>
+            <x-ui.button variant="ghost" size="sm" icon="history" :href="route('pricing.rates.history')">Rate history</x-ui.button>
+        </div>
+    @else
     <x-ui.page-header title="Daily Rate Entry" subtitle="Today's rate for each metal and carat, per gram. Each is entered separately."
         :crumbs="[['label' => 'Pricing & Rates', 'href' => route('pricing.rates')], ['label' => 'Daily Rate Entry']]">
         <x-slot:actions>
             <x-ui.button variant="secondary" icon="history" :href="route('pricing.rates.history')">Rate history</x-ui.button>
         </x-slot:actions>
     </x-ui.page-header>
+    @endif
 
     @if ($zeroWarning)
         <div class="mb-4 flex items-start gap-3 px-4 py-3 rounded-control bg-warning-bg text-warning text-[13px]">

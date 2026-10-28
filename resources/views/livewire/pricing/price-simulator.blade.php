@@ -1,6 +1,20 @@
 <div>
+    @if ($embedded)
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <div>
+                <h2 class="font-display text-[24px] leading-tight font-semibold text-ink_text-primary">Price simulator</h2>
+                <p class="text-[12.5px] text-ink_text-secondary">Try a piece and see how its price is worked out. Nothing here is saved.</p>
+            </div>
+            @if ($canSell)<x-ui.button icon="receipt" :href="route('sales.new')">Add New Sale</x-ui.button>@endif
+        </div>
+    @else
     <x-ui.page-header title="Price simulator" subtitle="Try a piece and see how its price is worked out. Nothing here is saved."
-        :crumbs="[['label' => 'Pricing & Rates', 'href' => route('pricing.rates')], ['label' => 'Price simulator']]" />
+        :crumbs="[['label' => 'Pricing & Rates', 'href' => route('pricing.rates')], ['label' => 'Price simulator']]">
+        @if ($canSell)
+            <x-slot:actions><x-ui.button icon="receipt" :href="route('sales.new')">Add New Sale</x-ui.button></x-slot:actions>
+        @endif
+    </x-ui.page-header>
+    @endif
 
     <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_420px] gap-6 items-start">
         <x-ui.card title="The piece" icon="gem">
@@ -60,6 +74,28 @@
                     <div class="flex justify-between"><dt class="text-ink_text-secondary">Weight charged</dt><dd class="tabular">{{ number_format($result['weight'], 3) }} g</dd></div>
                     <div class="flex justify-between font-semibold"><dt>Metal value</dt><dd class="tabular">₹{{ number_format($result['metal_value'], 2) }}</dd></div>
                     <div class="flex justify-between"><dt class="text-ink_text-secondary">Making charge</dt><dd class="tabular">₹{{ number_format($result['making'], 2) }}</dd></div>
+                    @php
+                        $kind = $result['making_kind'];
+                        $unit = match ($kind) { 'percentage' => '%', 'per_gram' => '₹ / g', default => '₹ / piece' };
+                        $canBargain = $result['making_default_rate'] > 0 && $result['making_min_rate'] < $result['making_default_rate'];
+                        $saved = round($result['making_at_default'] - $result['making'], 2);
+                    @endphp
+                    @if ($canBargain)
+                        <div class="rounded-xl bg-surface-sunken px-3.5 py-3" x-data="{ r: {{ $result['making_rate'] }} }" wire:key="sim-slider-{{ $result['making_rate'] }}-{{ $result['making_default_rate'] }}">
+                            <div class="flex items-baseline justify-between gap-2 mb-1">
+                                <span class="text-[12px] font-semibold text-ink_text-secondary">Bargain the making charge</span>
+                                @if ($saved > 0)<button type="button" wire:click="setBargain('')" class="text-[11.5px] text-ink_text-muted underline hover:text-ink_text-primary">Back to {{ \App\Services\PricingService::rateText($kind, $result['making_default_rate']) }}</button>@endif
+                            </div>
+                            <input type="range" min="{{ $result['making_min_rate'] }}" max="{{ $result['making_default_rate'] }}" step="{{ $kind === 'percentage' ? 0.25 : ($kind === 'per_gram' ? 1 : 5) }}" x-model.number="r"
+                                x-on:change="$wire.setBargain(r)" class="w-full accent-gold" aria-label="Making charge slider">
+                            <div class="flex justify-between text-[11px] text-ink_text-muted tabular">
+                                <span>{{ rtrim(rtrim(number_format($result['making_min_rate'], 2), '0'), '.') }}{{ $unit === '%' ? '%' : '' }}</span>
+                                <span x-text="r + '{{ $unit === '%' ? '%' : ' ' . $unit }}'" class="font-semibold text-ink_text-secondary"></span>
+                                <span>{{ rtrim(rtrim(number_format($result['making_default_rate'], 2), '0'), '.') }}{{ $unit === '%' ? '%' : '' }}</span>
+                            </div>
+                            @if ($saved > 0)<p class="mt-1 text-[12px] font-semibold text-danger">Making charge reduced by ₹{{ number_format($saved, 2) }}</p>@endif
+                        </div>
+                    @endif
                     @if ($result['stone_value'] > 0)<div class="flex justify-between"><dt class="text-ink_text-secondary">Stones</dt><dd class="tabular">₹{{ number_format($result['stone_value'], 2) }}</dd></div>@endif
                     <div class="flex justify-between"><dt class="text-ink_text-secondary">Hallmarking charge</dt><dd class="tabular">₹{{ number_format($result['huid_charge'], 2) }}</dd></div>
                     @foreach ($result['additional_lines'] as $line)<div class="flex justify-between"><dt class="text-ink_text-secondary">{{ $line['name'] }}</dt><dd class="tabular">₹{{ number_format($line['amount'], 2) }}</dd></div>@endforeach
