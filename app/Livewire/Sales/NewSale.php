@@ -949,6 +949,8 @@ class NewSale extends Component
             return;
         }
 
+        \App\Support\MoneyMessages::saleEntered($sale);
+
         session()->flash('toast', "Sale #{$sale->id} is held until an admin verifies it.");
 
         return $this->redirectRoute('sales.invoice', $sale);

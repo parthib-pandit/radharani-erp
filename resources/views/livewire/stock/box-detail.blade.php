@@ -54,7 +54,7 @@
                 @endif
             </x-ui.card>
 
-            <x-ui.card title="History" subtitle="Movements, packets added or removed, renames and QR scans" icon="history">
+            <x-ui.card title="History" subtitle="Movements, packets added or removed, sales, renames and QR scans" icon="history">
                 <x-ui.timeline :events="$events" empty-title="No history recorded yet" empty-message="Movements, reassignments and scans will appear here." />
             </x-ui.card>
         </div>
@@ -76,9 +76,6 @@
                     </div>
                 </div>
                 <x-stock.status-mix :counts="$statusCounts" :total="$pieces" />
-                @if ($soldCount > 0)
-                    <p class="mt-3 text-[12px] text-ink_text-muted">{{ $soldCount }} sold {{ \Illuminate\Support\Str::plural('piece', $soldCount) }} left this box and {{ $soldCount === 1 ? 'is' : 'are' }} not counted.</p>
-                @endif
                 @if ($metalWeights->filter()->isNotEmpty())
                     <div class="mt-4 pt-4 border-t border-line-light flex flex-wrap gap-1.5">
                         @foreach ($metalWeights->filter() as $metal => $w)

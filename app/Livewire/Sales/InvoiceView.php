@@ -45,7 +45,8 @@ class InvoiceView extends Component
             return;
         }
 
-        SalePayment::create(['sale_id' => $sale->id, 'mode' => $this->mode, 'amount' => round((float) $this->amount, 2), 'note' => $this->note ?: null, 'user_id' => Auth::id()]);
+        $payment = SalePayment::create(['sale_id' => $sale->id, 'mode' => $this->mode, 'amount' => round((float) $this->amount, 2), 'note' => $this->note ?: null, 'user_id' => Auth::id()]);
+        \App\Support\MoneyMessages::paymentReceived($sale, $payment);
         $this->reset(['amount', 'note']);
         $this->dispatch('toast', message: 'Payment recorded.', type: 'success');
     }

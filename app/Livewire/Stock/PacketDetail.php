@@ -127,7 +127,6 @@ class PacketDetail extends Component
 
         return view('livewire.stock.packet-detail', [
             'items' => $items,
-            'soldItems' => $all->where('status', 'sold')->values(),
             'statusCounts' => $items->countBy('status'),
             'metalWeights' => $items->groupBy('metal')->map->sum('weight'),
             'events' => $history->forPacket($this->packet),

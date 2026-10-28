@@ -89,6 +89,8 @@ class SaleCanceller
                 'held_on_account' => round($held, 2), 'credit_returned' => round($returned, 2), 'user_id' => Auth::id(),
             ]);
 
+            \App\Support\MoneyMessages::saleCancelled($sale, $reason, $held, $returned);
+
             activity('sales')->performedOn($sale)->causedBy(Auth::user())->event('cancelled')
                 ->log("Sale #{$sale->id} cancelled" . ($sale->confirmed_by_accountant ? ' after verification' : '') . ": {$reason}");
 

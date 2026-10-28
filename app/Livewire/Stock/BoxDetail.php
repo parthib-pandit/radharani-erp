@@ -114,7 +114,6 @@ class BoxDetail extends Component
 
         return view('livewire.stock.box-detail', [
             'packets' => $packets,
-            'soldCount' => (clone $inside)->where('status', 'sold')->count(),
             'pieces' => (clone $items)->count(),
             'weight' => (float) (clone $items)->sum('weight'),
             'statusCounts' => (clone $items)->selectRaw('status, count(*) as c')->groupBy('status')->pluck('c', 'status'),

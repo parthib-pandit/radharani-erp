@@ -19,10 +19,13 @@ class AdvanceService
 
     public function receive(int $customerId, float $amount, string $mode, ?string $occasion = null, ?string $note = null): CustomerAdvance
     {
-        return CustomerAdvance::create([
+        $advance = CustomerAdvance::create([
             'customer_id' => $customerId, 'kind' => 'received', 'amount' => abs(round($amount, 2)), 'mode' => $mode,
             'occasion' => $occasion ?: null, 'note' => $note ?: null, 'user_id' => Auth::id(),
         ]);
+        \App\Support\MoneyMessages::advanceReceived($advance);
+
+        return $advance;
     }
 
     /** Spend advance on a sale. Call inside the transaction that saves the sale. */

@@ -37,14 +37,15 @@
         </x-slot:head>
 
         @forelse ($messages as $m)
+            @php $internal = \App\Support\MessageTemplates::groupOf($m->type) === 'Money'; @endphp
             <tr wire:key="msg-{{ $m->id }}" x-data="{ copied: false }">
                 <td><x-ui.badge tone="neutral" size="sm">{{ \App\Support\MessageTemplates::groupOf($m->type) }} · {{ \App\Support\MessageTemplates::label($m->type) }}</x-ui.badge></td>
-                <td class="text-ink_text-primary">{{ $m->customer->name ?? $m->recipient_name ?? '—' }}</td>
-                <td class="text-ink_text-secondary">{{ $m->customer->phone ?? $m->recipient_phone ?? '—' }}</td>
+                <td class="text-ink_text-primary">{{ $internal ? 'Staff' : ($m->customer->name ?? $m->recipient_name ?? '—') }}</td>
+                <td class="text-ink_text-secondary">{{ $internal ? '—' : ($m->customer->phone ?? $m->recipient_phone ?? '—') }}</td>
                 <td class="text-ink_text-primary max-w-[320px] truncate" title="{{ $m->message }}">{{ $m->message }}</td>
                 <td>
                     @if ($m->status === 'sent')
-                        <x-ui.badge tone="success" size="sm" dot>Sent</x-ui.badge>
+                        <x-ui.badge tone="success" size="sm" dot>{{ $internal ? 'Seen' : 'Sent' }}</x-ui.badge>
                     @else
                         <x-ui.badge tone="warning" size="sm" dot>Pending</x-ui.badge>
                     @endif
@@ -59,8 +60,8 @@
                         </x-ui.button>
                         @if ($m->status === 'pending')
                             <x-ui.button type="button" variant="primary" size="sm" icon="check"
-                                x-on:click="$dispatch('rj-confirm', { title: 'Mark as sent?', message: 'Confirm only after you have actually sent this message to the customer.', confirm: 'Mark sent', action: () => $wire.markSent({{ $m->id }}) })">
-                                Mark sent
+                                x-on:click="$dispatch('rj-confirm', { title: '{{ $internal ? 'Mark as seen?' : 'Mark as sent?' }}', message: '{{ $internal ? 'This is a note for the staff about money that came in or went back. Mark it seen once someone has read it.' : 'Confirm only after you have actually sent this message to the customer.' }}', confirm: '{{ $internal ? 'Mark seen' : 'Mark sent' }}', action: () => $wire.markSent({{ $m->id }}) })">
+                                {{ $internal ? 'Mark seen' : 'Mark sent' }}
                             </x-ui.button>
                         @endif
                     </div>

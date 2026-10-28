@@ -34,6 +34,7 @@ class OrderDetail extends Component
 
         OrderPayment::create(['order_id' => $this->order->id, 'amount' => round((float) $this->advanceAmount, 2), 'mode' => $this->advanceMode,
             'note' => trim($this->advanceNote) ?: null, 'user_id' => auth()->id()]);
+        \App\Support\MoneyMessages::orderAdvance($this->order, (float) $this->advanceAmount, $this->advanceMode);
 
         $this->reset(['advanceAmount', 'advanceNote']);
         $this->dispatch('toast', message: 'Advance recorded.', type: 'success');
