@@ -10,6 +10,9 @@ class SalePayment extends Model
     // 'exchange' and 'advance' are never picked from the list: they appear only when a customer's exchange credit or advance is used.
     public const MODES = ['cash' => 'Cash', 'upi' => 'UPI', 'card' => 'Card', 'bank' => 'Bank', 'cheque' => 'Cheque', 'exchange' => 'Exchange credit', 'advance' => 'Advance'];
 
+    /** What a new payment can be (28 Oct): cash or bank. UPI, card and cheque stay in MODES so older payments still read. */
+    public const NEW_MODES = ['cash' => 'Cash', 'bank' => 'Bank'];
+
     public $timestamps = false;
 
     protected $casts = ['created_at' => 'datetime'];

@@ -106,14 +106,14 @@ class DefaultChargesTest extends TestCase
         $other = $this->piece([['name' => 'Polish', 'amount' => 100]]);
         $customer = Customer::create(['name' => 'Charge Customer', 'phone' => (string) random_int(6000000000, 9999999999)]);
 
-        $c = Livewire::test(NewSale::class)->set('customerId', $customer->id)->call('next')->call('addItem', $item->id)->call('addItem', $other->id);
+        $c = Livewire::test(NewSale::class)->set('customerId', $customer->id)->call('addItem', $item->id)->call('addItem', $other->id);
         $this->assertSame(['Sakha', 'Polish'], collect($c->get('extras'))->pluck('name')->all());
 
         $c->call('removeItem', $other->id);
         $this->assertSame(['Sakha'], collect($c->get('extras'))->pluck('name')->all(), 'the charge goes with its piece');
 
         // Staff can change the amount; it is added after the GST, so it is not taxed.
-        $c->call('next')->set('extras.0.amount', '300')->call('next')->call('next')->call('submit')->assertHasNoErrors();
+        $c->call('next')->set('extras.0.amount', '300')->call('next')->call('next')->call('next')->call('submit')->assertHasNoErrors();
         $sale = Sale::latest('id')->first();
         $this->assertEquals([['name' => 'Sakha', 'amount' => 300]], $sale->additional_charges);
         $this->assertEquals(5000 + 150 + 300, (float) $sale->total, '5 g of gold, 3% GST on it, and 300 added after the GST without tax');

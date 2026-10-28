@@ -30,6 +30,8 @@ class MessageTemplates
             'order_to_hallmarking' => 'Sent to hallmarking',
             'order_ready' => 'Ready to collect',
         ],
+        // For the employees, not the customer: money events (28 Oct). Marked seen, not sent.
+        'Money' => MoneyMessages::TYPES,
         'Other' => ['exchange_valuation_ready' => 'Exchange valuation ready', 'other' => 'Other'],
     ];
 

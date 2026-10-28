@@ -118,7 +118,7 @@
             <x-ui.field label="Amount" for="ce-amount" error="entryAmount">
                 <div class="relative">
                     <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px] text-ink_text-muted pointer-events-none">₹</span>
-                    <input id="ce-amount" type="number" step="0.01" min="0" wire:model="entryAmount" class="rj-input pl-8 tabular @error('entryAmount') is-invalid @enderror" inputmode="decimal" autofocus>
+                    <input id="ce-amount" type="text" inputmode="decimal" autocomplete="off" wire:model="entryAmount" class="rj-input pl-8 tabular @error('entryAmount') is-invalid @enderror" inputmode="decimal" autofocus>
                 </div>
             </x-ui.field>
             <x-ui.field :label="$entryKind === 'receipt' ? 'Received from, or why' : 'Paid to, or for what'" for="ce-reason" error="entryReason">
@@ -141,7 +141,7 @@
             <x-ui.field label="Amount" for="ct-amount" error="transferAmount">
                 <div class="relative">
                     <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px] text-ink_text-muted pointer-events-none">₹</span>
-                    <input id="ct-amount" type="number" step="0.01" min="0" wire:model="transferAmount" class="rj-input pl-8 tabular @error('transferAmount') is-invalid @enderror" inputmode="decimal" autofocus>
+                    <input id="ct-amount" type="text" inputmode="decimal" autocomplete="off" wire:model="transferAmount" class="rj-input pl-8 tabular @error('transferAmount') is-invalid @enderror" inputmode="decimal" autofocus>
                 </div>
             </x-ui.field>
             <x-ui.field label="Why" for="ct-reason" error="transferReason">
@@ -160,7 +160,7 @@
         <x-ui.field label="Amount" for="co-amount" error="openingAmount">
             <div class="relative">
                 <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-[13px] text-ink_text-muted pointer-events-none">₹</span>
-                <input id="co-amount" type="number" step="0.01" min="0" wire:model="openingAmount" class="rj-input pl-8 tabular @error('openingAmount') is-invalid @enderror" inputmode="decimal" autofocus>
+                <input id="co-amount" type="text" inputmode="decimal" autocomplete="off" wire:model="openingAmount" class="rj-input pl-8 tabular @error('openingAmount') is-invalid @enderror" inputmode="decimal" autofocus>
             </div>
         </x-ui.field>
         <x-slot:footer>
@@ -190,7 +190,7 @@
             <span class="text-[11.5px] font-semibold uppercase tracking-wide text-ink_text-muted text-right">Amount</span>
             @foreach ($denominations as $d)
                 <label for="cd-{{ $d }}" class="font-semibold tabular">₹{{ number_format($d) }}</label>
-                <input id="cd-{{ $d }}" type="number" min="0" step="1" wire:model.live.debounce.250ms="counts.{{ $d }}" class="rj-input rj-input-sm tabular text-right" inputmode="numeric" aria-label="How many ₹{{ $d }}">
+                <input id="cd-{{ $d }}" type="text" inputmode="numeric" autocomplete="off" wire:model.live.debounce.250ms="counts.{{ $d }}" class="rj-input rj-input-sm tabular text-right" inputmode="numeric" aria-label="How many ₹{{ $d }}">
                 <span class="text-right tabular text-ink_text-secondary">{{ number_format(max(0, (int) ($counts[$d] ?? 0)) * $d) }}</span>
             @endforeach
         </div>

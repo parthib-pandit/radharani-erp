@@ -61,30 +61,7 @@
                 @endif
             </x-ui.card>
 
-            @if ($soldItems->isNotEmpty())
-                <details class="rounded-card border border-line bg-surface shadow-card group">
-                    <summary class="flex items-center justify-between gap-3 px-5 py-3.5 cursor-pointer select-none">
-                        <span class="text-[13.5px] font-semibold text-ink_text-primary">Sold from this packet</span>
-                        <span class="text-[12.5px] text-ink_text-muted">{{ $soldItems->count() }} {{ \Illuminate\Support\Str::plural('piece', $soldItems->count()) }} · not counted above</span>
-                    </summary>
-                    <div class="border-t border-line-light">
-                        <x-ui.table :headers="['Piece', ['label' => 'Weight', 'class' => 'text-right'], 'Status']">
-                            @foreach ($soldItems as $item)
-                                <tr wire:key="sold-{{ $item->id }}">
-                                    <td>
-                                        <a href="{{ route('stock.items.show', $item) }}" class="rj-code text-ink_text-primary hover:text-gold-dark">{{ $item->label }}</a>
-                                        <span class="block text-[12.5px] text-ink_text-secondary">{{ $item->category }}</span>
-                                    </td>
-                                    <td class="text-right tabular whitespace-nowrap">{{ number_format($item->weight, 3) }} g</td>
-                                    <td><x-ui.status :status="$item->status" size="sm" /></td>
-                                </tr>
-                            @endforeach
-                        </x-ui.table>
-                    </div>
-                </details>
-            @endif
-
-            <x-ui.card title="History" subtitle="Pieces added or removed, box moves, movements and QR scans" icon="history">
+            <x-ui.card title="History" subtitle="Pieces added, removed or sold, box moves, movements and QR scans" icon="history">
                 <x-ui.timeline :events="$events" empty-title="No history recorded yet" />
             </x-ui.card>
         </div>

@@ -129,7 +129,7 @@
                     <x-ui.field label="Metal" for="ra-metal"><select id="ra-metal" wire:model.live="adjustMetal" class="rj-select">@foreach ($metals as $m)<option value="{{ $m }}">{{ ucfirst($m) }}</option>@endforeach</select></x-ui.field>
                     <x-ui.field label="Carat" for="ra-carat" error="adjustCarat"><select id="ra-carat" wire:model="adjustCarat" class="rj-select">@foreach ($carats[$adjustMetal] ?? [] as $c)<option value="{{ $c }}">{{ $c }}</option>@endforeach</select></x-ui.field>
                     <x-ui.field label="Kind" for="ra-kind"><select id="ra-kind" wire:model="adjustKind" class="rj-select">@foreach (\App\Models\Movement\RawMetalEntry::KINDS as $k => $l)<option value="{{ $k }}">{{ $l }}</option>@endforeach</select></x-ui.field>
-                    <x-ui.field label="Weight (g)" for="ra-weight" error="adjustWeight"><input id="ra-weight" type="number" step="0.001" min="0" wire:model="adjustWeight" class="rj-input tabular @error('adjustWeight') is-invalid @enderror" autofocus></x-ui.field>
+                    <x-ui.field label="Weight (g)" for="ra-weight" error="adjustWeight"><input id="ra-weight" type="text" inputmode="decimal" autocomplete="off" wire:model="adjustWeight" class="rj-input tabular @error('adjustWeight') is-invalid @enderror" autofocus></x-ui.field>
                 </div>
                 <x-ui.field label="Why" for="ra-note" error="adjustNote"><input id="ra-note" type="text" wire:model="adjustNote" maxlength="255" class="rj-input @error('adjustNote') is-invalid @enderror" placeholder="e.g. opening balance, scrap swept from the workshop"></x-ui.field>
             </div>
@@ -152,7 +152,7 @@
                 </x-ui.field>
                 @php $pickedMetal = collect($unrefined)->firstWhere('key', $fromKey)['metal'] ?? 'gold'; @endphp
                 <div class="grid grid-cols-2 gap-4">
-                    <x-ui.field label="Weight (g)" for="rc-weight" error="reclassWeight"><input id="rc-weight" type="number" step="0.001" min="0" wire:model="reclassWeight" class="rj-input tabular @error('reclassWeight') is-invalid @enderror"></x-ui.field>
+                    <x-ui.field label="Weight (g)" for="rc-weight" error="reclassWeight"><input id="rc-weight" type="text" inputmode="decimal" autocomplete="off" wire:model="reclassWeight" class="rj-input tabular @error('reclassWeight') is-invalid @enderror"></x-ui.field>
                     <x-ui.field label="Carat it is now" for="rc-carat" error="reclassCarat"><select id="rc-carat" wire:model="reclassCarat" class="rj-select"><option value="">Choose...</option>@foreach ($carats[$pickedMetal] ?? [] as $c)<option value="{{ $c }}">{{ $c }}</option>@endforeach</select></x-ui.field>
                 </div>
                 <x-ui.field label="How it was tested" for="rc-note" error="reclassNote"><input id="rc-note" type="text" wire:model="reclassNote" maxlength="255" class="rj-input @error('reclassNote') is-invalid @enderror" placeholder="e.g. melted and assayed at 91.6"></x-ui.field>
@@ -174,7 +174,7 @@
                     </select>
                     @if (empty($held))<p class="rj-help">No karigar is holding metal.</p>@endif
                 </x-ui.field>
-                <x-ui.field label="Weight (g)" for="kb-weight" error="returnWeight"><input id="kb-weight" type="number" step="0.001" min="0" wire:model="returnWeight" class="rj-input tabular @error('returnWeight') is-invalid @enderror"></x-ui.field>
+                <x-ui.field label="Weight (g)" for="kb-weight" error="returnWeight"><input id="kb-weight" type="text" inputmode="decimal" autocomplete="off" wire:model="returnWeight" class="rj-input tabular @error('returnWeight') is-invalid @enderror"></x-ui.field>
                 <x-ui.field label="Note" for="kb-note" optional><input id="kb-note" type="text" wire:model="returnNote" maxlength="255" class="rj-input"></x-ui.field>
             </div>
             <x-slot:footer>

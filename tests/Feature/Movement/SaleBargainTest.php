@@ -63,7 +63,7 @@ class SaleBargainTest extends TestCase
     {
         $customer = Customer::create(['name' => 'Bargain Customer', 'phone' => (string) random_int(6000000000, 9999999999)]);
 
-        return Livewire::test(NewSale::class)->set('customerId', $customer->id)->call('next')->call('addItem', $item->id);
+        return Livewire::test(NewSale::class)->set('customerId', $customer->id)->call('addItem', $item->id);
     }
 
     public function test_a_weight_and_a_making_rate_can_be_bargained_in_the_service(): void
@@ -122,7 +122,7 @@ class SaleBargainTest extends TestCase
         $this->assertEquals(9500 + 1520 + 100, $line['price']);   // 9.5 g, making 16% of 9,500, hallmarking
         $this->assertEquals(1710 - 1520, $line['making_saved']);
 
-        $c->call('next')->call('next')->call('next')->call('submit')->assertHasNoErrors();
+        $c->call('next')->call('next')->call('next')->call('next')->call('submit')->assertHasNoErrors();
 
         $sale = Sale::latest('id')->first();
         $pivot = $sale->items()->first()->pivot;
@@ -145,7 +145,7 @@ class SaleBargainTest extends TestCase
         $item = $this->piece(10);
 
         $c = $this->sale($item)->set("cart.{$item->id}.price", 1)->set("cart.{$item->id}.making_set", ['rate' => 0.5]);
-        $c->call('next')->call('next')->call('next')->call('submit')->assertHasNoErrors();
+        $c->call('next')->call('next')->call('next')->call('next')->call('submit')->assertHasNoErrors();
 
         $pivot = Sale::latest('id')->first()->items()->first()->pivot;
         $this->assertEquals(10000 + 1000 + 100, (float) $pivot->price_at_sale, 'priced again on the server, at the floor');
@@ -162,7 +162,7 @@ class SaleBargainTest extends TestCase
         // Too much: more than the making charge (1,800) and its GST
         $c = $this->sale($this->piece(10))->call('next')->set('finalType', 'flat')->set('finalValue', '5000')->call('next');
         $c->assertHasErrors('finalValue');
-        $this->assertSame(3, $c->get('step'), 'stays on the charges step');
+        $this->assertSame(2, $c->get('step'), 'stays on the bill step');
     }
 
     public function test_a_final_price_gives_the_discount(): void
@@ -171,25 +171,23 @@ class SaleBargainTest extends TestCase
 
         $c = $this->sale($item)->call('next')->set('finalType', 'final')->set('finalValue', '12200')->call('next');
         $this->assertEquals(12200, $c->get('total'));
-        $c->call('next')->call('submit')->assertHasNoErrors();
+        $c->call('next')->call('next')->call('submit')->assertHasNoErrors();
 
         $sale = Sale::latest('id')->first();
         $this->assertEquals(72, (float) $sale->final_discount);
         $this->assertEquals(12200, (float) $sale->total);
     }
 
-    public function test_add_sale_on_a_piece_opens_a_bill_with_it_on_and_asks_for_the_customer(): void
+    public function test_add_sale_on_a_piece_opens_a_bill_with_it_on_and_the_customer_comes_later(): void
     {
         $item = $this->piece();
 
         $this->get(route('stock.items.show', $item))->assertOk()->assertSee('Add sale')->assertSee(route('sales.new', ['item' => $item->id]), false);
 
         $c = Livewire::withQueryParams(['item' => $item->id])->test(NewSale::class);
-        $this->assertSame(1, $c->get('step'), 'the customer comes first');
+        $this->assertSame(1, $c->get('step'), 'it opens on the pieces, with this one already on the bill');
         $this->assertArrayHasKey($item->id, $c->get('cart'));
-        $c->assertSee('On this bill');
-        $c->set('customerId', Customer::create(['name' => 'From Piece', 'phone' => (string) random_int(6000000000, 9999999999)])->id)->call('next')
-            ->assertSet('step', 2);
+        $c->call('next')->assertSet('step', 2)->call('next')->assertSet('step', 3);   // then the customer is asked for
     }
 
     public function test_add_sale_is_not_offered_for_a_piece_that_can_not_be_sold(): void

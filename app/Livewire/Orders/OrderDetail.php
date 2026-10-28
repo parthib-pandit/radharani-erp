@@ -28,12 +28,13 @@ class OrderDetail extends Component
 
         $this->validate([
             'advanceAmount' => ['required', 'numeric', 'min:0.01', 'max:99999999'],
-            'advanceMode' => ['required', 'in:' . implode(',', array_keys(OrderPayment::MODES))],
+            'advanceMode' => ['required', 'in:' . implode(',', array_keys(OrderPayment::NEW_MODES))],
             'advanceNote' => ['nullable', 'string', 'max:255'],
         ], [], ['advanceAmount' => 'amount']);
 
         OrderPayment::create(['order_id' => $this->order->id, 'amount' => round((float) $this->advanceAmount, 2), 'mode' => $this->advanceMode,
             'note' => trim($this->advanceNote) ?: null, 'user_id' => auth()->id()]);
+        \App\Support\MoneyMessages::orderAdvance($this->order, (float) $this->advanceAmount, $this->advanceMode);
 
         $this->reset(['advanceAmount', 'advanceNote']);
         $this->dispatch('toast', message: 'Advance recorded.', type: 'success');

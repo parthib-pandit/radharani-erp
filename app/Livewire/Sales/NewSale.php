@@ -23,15 +23,16 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 
 /**
- * New Sale as a step form (8 Oct change list, section 12): Customer, Items, Charges, Payment,
- * Review. Going back to an earlier step is always possible and the figures follow.
+ * New Sale as a step form (8 Oct change list, section 12; order changed 28 Oct): Items, This bill, Customer,
+ * Payment, Review. Going back to an earlier step is always possible and the figures follow.
  *
  * On save the sale is held as 'reserved' until an admin verifies it (rule 10). The bill is paid
  * in parts if need be; the balance is worked out from the payments and cleared later.
  */
 class NewSale extends Component
 {
-    public const STEPS = [1 => 'Customer', 2 => 'Items', 3 => 'Charges', 4 => 'Payment', 5 => 'Review'];
+    // 28 Oct: the pieces first, then the whole bill on one screen, then who is buying (the shared Walk-in customer is one tap), then payment.
+    public const STEPS = [1 => 'Items', 2 => 'This bill', 3 => 'Customer', 4 => 'Payment', 5 => 'Review'];
 
     public int $step = 1;
     public int $reach = 1;
@@ -64,6 +65,10 @@ class NewSale extends Component
     public string $itemSearch = '';
     public array $cart = [];
     public string $overrideNote = '';
+
+    // Pieces still recorded as in the vault: a popup offers to move them to the counter (nothing moves until it is pressed).
+    public bool $showVaultMove = false;
+    public array $vaultPieces = [];
 
     // GST on this bill: the owner's defaults, which staff can change (or set to 0) before billing.
     // The owner's GST rates (Pricing rules > GST), set when the form opens. No longer a choice on the bill (17 Oct); locked so the browser can not change them.
@@ -126,11 +131,6 @@ class NewSale extends Component
                 $this->dispatch('toast', message: "{$piece->label} is " . str_replace('_', ' ', $piece->status) . ' and can not be billed.', type: 'error');
             }
         }
-        if ($this->customerId) {
-            $this->step = max($this->step, 2);
-            $this->reach = max($this->reach, 2);
-        }
-
         if (! $this->orderId) {
             return;
         }
@@ -141,8 +141,6 @@ class NewSale extends Component
             return;
         }
         $this->customerId = $order->customer_id;
-        $this->reach = 2;
-        $this->step = 2;
         // The advance already paid on the order counts towards this bill. Staff set the mode it was paid in.
         $lines = [];
         if ((float) $order->advance_amount > 0) {
@@ -230,12 +228,12 @@ class NewSale extends Component
     {
         $this->resetValidation();
 
-        if ($step === 1 && ! $this->customerId) {
-            $this->addError('customerId', 'Choose the customer, or add a new one.');
+        if ($step === 3 && ! $this->customerId) {
+            $this->addError('customerId', 'Choose the customer, the walk-in customer, or add a new one.');
 
             return false;
         }
-        if ($step === 2) {
+        if ($step === 1) {
             if (! $this->cart) {
                 $this->addError('cart', 'Add at least one piece.');
 
@@ -251,7 +249,7 @@ class NewSale extends Component
             }
             $this->refreshCart();
             if (collect($this->cart)->contains('inVault', true)) {
-                $this->addError('cart', 'Some pieces are still recorded as in the vault. Move them to the counter first.');
+                $this->openVaultPrompt();
 
                 return false;
             }
@@ -266,7 +264,7 @@ class NewSale extends Component
                 return false;
             }
         }
-        if ($step === 3) {
+        if ($step === 2) {
             foreach ($this->extras as $i => $e) {
                 if (($e['name'] ?? '') === '' && ($e['amount'] ?? '') === '') {
                     continue;
@@ -278,7 +276,7 @@ class NewSale extends Component
                 }
             }
         }
-        if ($step === 3 && trim((string) $this->finalValue) !== '') {
+        if ($step === 2 && trim((string) $this->finalValue) !== '') {
             $bill = $this->totals();
             if (! is_numeric($this->finalValue) || (float) $this->finalValue < 0) {
                 $this->addError('finalValue', 'Enter an amount.');
@@ -300,6 +298,11 @@ class NewSale extends Component
                 }
             }
             foreach ($this->payments as $i => $p) {
+                if (! array_key_exists($p['mode'] ?? '', SalePayment::MODES)) {
+                    $this->addError("payments.{$i}.amount", 'Choose cash or bank.');
+
+                    return false;
+                }
                 $amount = is_numeric($p['amount'] ?? null) ? (float) $p['amount'] : 0.0;
                 if (($p['mode'] ?? '') === 'advance' && $amount > $this->advanceLeft($i) + 0.005) {
                     $this->addError("payments.{$i}.amount", 'That is more advance than this customer has left (₹' . number_format($this->advanceLeft($i), 2) . ').');
@@ -332,7 +335,17 @@ class NewSale extends Component
         $this->customerId = $id;
         $this->customerSearch = '';
         $this->resetErrorBag('customerId');
+        // The walk-in customer has no code to refer anyone with.
+        if (Customer::whereKey($id)->value('is_walk_in')) {
+            $this->referralCode = '';
+        }
         $this->checkReferral();
+    }
+
+    // One tap for a buyer who gives no details: the shared Walk-in customer, with its own ledger.
+    public function chooseWalkIn(): void
+    {
+        $this->chooseCustomer(Customer::walkIn()->id);
     }
 
     public function clearCustomer(): void
@@ -408,6 +421,32 @@ class NewSale extends Component
         $this->cart[$itemId] = $this->cartLine($item);
         $this->addDefaultCharges($item);
         $this->resetErrorBag('cart');
+        if ($this->cart[$itemId]['inVault']) {
+            $this->openVaultPrompt();
+        }
+    }
+
+    // The popup that offers to move what is still in the vault to the counter. Nothing moves until Move to Counter is pressed.
+    private function openVaultPrompt(): void
+    {
+        $this->vaultPieces = collect($this->cart)->filter(fn ($c) => $c['inVault'])->map(fn ($c, $id) => ['id' => $id, 'label' => $c['label'], 'category' => $c['category']])->values()->all();
+        $this->showVaultMove = ! empty($this->vaultPieces);
+    }
+
+    public function moveVaultPiecesToCounter(): void
+    {
+        abort_unless(Auth::user()?->can('movement.create'), 403);
+        foreach (Item::whereKey(collect($this->vaultPieces)->pluck('id'))->get() as $item) {
+            if (Location::isInVault($item)) {
+                Location::sendToFloor($item);
+            }
+            $this->cart[$item->id] = $this->cartLine($item, $this->cart[$item->id] ?? []);
+        }
+        $n = count($this->vaultPieces);
+        $this->showVaultMove = false;
+        $this->vaultPieces = [];
+        $this->resetErrorBag('cart');
+        $this->dispatch('toast', message: $n . ' ' . \Illuminate\Support\Str::plural('piece', $n) . ' moved to the counter.', type: 'success');
     }
 
     // The additional charges a piece carries by default start on the bill, tied to the piece. Staff can change or remove them on the charges step.
@@ -516,6 +555,56 @@ class NewSale extends Component
         $this->cart[$itemId] = $this->cartLine($item, $this->cart[$itemId] ?? []);
         $this->resetErrorBag('cart');
         $this->dispatch('toast', message: "{$item->label} moved to the counter.", type: 'success');
+    }
+
+    /** The whole bill as plain text to paste into WhatsApp or a note (the Copy details button on Review). */
+    private function detailText(): string
+    {
+        $t = $this->totals();
+        $inr = fn ($n) => '₹' . number_format(abs((float) $n), 2);
+        $customer = $this->customerObject;
+        $lines = ['Radharani Jewellery Works', 'Bill, ' . now()->format('j M Y, g:i a'), ''];
+        $lines[] = 'Customer: ' . ($customer ? $customer->name . ($customer->is_walk_in ? '' : ' · ' . $customer->phone) : '-');
+        foreach ($this->cart as $line) {
+            $lines[] = '';
+            $lines[] = $line['label'] . ' · ' . $line['category'] . ' · ' . number_format($line['weight'], 3) . ' g'
+                . (abs($line['weight'] - $line['weight_listed']) > 0.0004 ? ' (record ' . number_format($line['weight_listed'], 3) . ' g)' : '');
+            foreach ($line['breakup'] ?? [] as $b) {
+                $lines[] = '  ' . $b['label'] . ($b['note'] ? ' (' . $b['note'] . ')' : '') . ': ' . ($b['amount'] < 0 ? '-' : '') . $inr($b['amount']);
+            }
+            $lines[] = '  Price before GST: ' . $inr($line['price']);
+        }
+        $lines[] = '';
+        $lines[] = 'Pieces: ' . $inr($t['pieces']);
+        if ($t['gst_jewellery'] > 0) {
+            $lines[] = 'GST ' . rtrim(rtrim(number_format($t['rates'][0], 2), '0'), '.') . '% on jewellery (CGST + SGST): ' . $inr($t['gst_jewellery']);
+        }
+        if ($t['gst_hallmark'] > 0) {
+            $lines[] = 'GST ' . rtrim(rtrim(number_format($t['rates'][1], 2), '0'), '.') . '% on hallmarking (CGST + SGST): ' . $inr($t['gst_hallmark']);
+        }
+        foreach ($this->extras as $e) {
+            if (($e['name'] ?? '') !== '' && is_numeric($e['amount'] ?? null) && (float) $e['amount'] > 0) {
+                $lines[] = $e['name'] . ': ' . $inr($e['amount']);
+            }
+        }
+        if ($t['round_off'] != 0) {
+            $lines[] = 'Round off: ' . ($t['round_off'] > 0 ? '+' : '-') . $inr($t['round_off']);
+        }
+        if ($t['final_discount'] > 0) {
+            $lines[] = 'Discount: -' . $inr($t['final_discount']);
+        }
+        $lines[] = 'Total: ' . $inr($t['total']);
+        foreach ($this->payments as $p) {
+            if (is_numeric($p['amount'] ?? null) && (float) $p['amount'] > 0) {
+                $lines[] = 'Paid by ' . (SalePayment::MODES[$p['mode']] ?? $p['mode']) . ': ' . $inr($p['amount']);
+            }
+        }
+        $lines[] = 'Balance: ' . $inr($this->getBalanceProperty());
+        if (trim($this->notes) !== '') {
+            $lines[] = 'Note: ' . trim($this->notes);
+        }
+
+        return implode("\n", $lines);
     }
 
     // Cancel the bill at any point: nothing has been saved yet, so nothing is held or paid, and the form is simply left.
@@ -860,6 +949,8 @@ class NewSale extends Component
             return;
         }
 
+        \App\Support\MoneyMessages::saleEntered($sale);
+
         session()->flash('toast', "Sale #{$sale->id} is held until an admin verifies it.");
 
         return $this->redirectRoute('sales.invoice', $sale);
@@ -872,22 +963,25 @@ class NewSale extends Component
             'customer' => $this->customerObject,
             'referrer' => $this->referralCustomerId ? Customer::find($this->referralCustomerId) : null,
             'customerResults' => $this->customerSearch !== ''
-                ? Customer::where('name', 'like', "%{$this->customerSearch}%")->orWhere('phone', 'like', "%{$this->customerSearch}%")->limit(8)->get()
+                ? Customer::real()->where(fn ($q) => $q->where('name', 'like', "%{$this->customerSearch}%")->orWhere('phone', 'like', "%{$this->customerSearch}%"))->limit(8)->get()
                 : collect(),
+            'walkIn' => $this->step === 3 ? Customer::walkIn() : null,
+            'copyText' => $this->step === 5 ? $this->detailText() : '',
             'itemResults' => $this->itemSearch !== ''
                 ? Item::where('status', 'in_stock')->whereNotIn('id', array_keys($this->cart))->searchAnything($this->itemSearch)->limit(8)->get()
                 : collect(),
             'orderModel' => $this->orderId ? Order::with('customer:id,name', 'images')->find($this->orderId) : null,
             'exchangeCredit' => $this->exchangeId ? ExchangeTransaction::find($this->exchangeId)?->creditRemaining() : null,
             'waitingReview' => $this->orderId ? (Order::find($this->orderId)?->piecesAwaitingReview() ?? 0) : 0,
-            'modes' => collect(SalePayment::MODES)->except(['exchange', 'advance'])->all(),
+            'modes' => SalePayment::NEW_MODES,
+            'modeLabels' => SalePayment::MODES,
             'advanceHeld' => $this->customerId && $this->step === 4 && ! collect($this->payments)->contains(fn ($p) => ($p['mode'] ?? '') === 'advance') ? app(AdvanceService::class)->balance($this->customerId) : 0.0,
             'gst' => $this->gstDetail(),
             'credits' => $this->customerId && $this->step === 4
                 ? app(ExchangeCredit::class)->available($this->customerId)
                     ->reject(fn ($x) => collect($this->payments)->contains(fn ($p) => ($p['exchange_id'] ?? null) === $x->id))->values()
                 : collect(),
-            'chargeNames' => $this->step === 3 ? \App\Support\ChargeNames::list() : [],
+            'chargeNames' => $this->step === 2 ? \App\Support\ChargeNames::list() : [],
             'canOverride' => $this->canOverride(),
             'hasOrderWarning' => collect($this->cart)->contains(fn ($c) => $c['order'] !== null),
         ])->layout('components.layouts.app', ['title' => 'New Sale — Radharani Jewellery']);

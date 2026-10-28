@@ -66,22 +66,45 @@ class CustodyCountsTest extends TestCase
         $this->assertSame(3, $this->packet->items()->count());
     }
 
-    public function test_the_detail_pages_and_list_show_custody_figures_and_the_sold_note(): void
+    public function test_the_detail_pages_and_list_show_custody_figures_and_the_list_notes_the_sold(): void
     {
         $this->piece('in_stock', 2);
         $this->piece('sold', 5);
 
         Livewire::test(PacketDetail::class, ['packet' => $this->packet])
             ->assertViewHas('items', fn ($items) => $items->count() === 1)
-            ->assertViewHas('soldItems', fn ($sold) => $sold->count() === 1)
-            ->assertSee('Sold from this packet');
+            ->assertDontSee('Sold from this packet');   // sales are in the History, not a block of their own
 
         Livewire::test(BoxDetail::class, ['box' => $this->box])
-            ->assertViewHas('pieces', 1)
-            ->assertViewHas('soldCount', 1);
+            ->assertViewHas('pieces', 1);
 
         Livewire::test(ContainerList::class)->set('search', $this->packet->code)
             ->assertSee('1 sold');
+    }
+
+    public function test_a_sale_shows_inside_the_history_of_the_piece_its_packet_and_its_box(): void
+    {
+        $sold = $this->piece('sold', 5);
+        $customer = \App\Models\Customer\Customer::create(['name' => 'History Buyer', 'phone' => (string) random_int(6000000000, 9999999999)]);
+        $sale = \App\Models\Sales\Sale::create(['customer_id' => $customer->id, 'invoice_number' => 'T' . random_int(100000, 999999), 'type' => 'sale', 'total' => 100, 'confirmed_by_accountant' => true, 'created_by' => auth()->id()]);
+        $sale->items()->attach($sold->id, ['price_at_sale' => 100]);
+
+        $history = app(\App\Services\StockHistoryService::class);
+        foreach ([[$history->forItem($sold), 'Sold (verified)'], [$history->forPacket($this->packet), 'Sold (verified): ' . $sold->label], [$history->forBox($this->box), 'Sold (verified): ' . $sold->label]] as [$events, $title]) {
+            $e = $events->firstWhere('kind', 'sale');
+            $this->assertNotNull($e, 'the sale is an event in the timeline');
+            $this->assertStringContainsString($title, $e['title']);
+            $this->assertContains('To History Buyer', $e['meta']);
+            $this->assertStringContainsString((string) $sale->id, (string) $e['link']);
+        }
+
+        // and a cancellation follows it
+        app(\App\Services\SaleCanceller::class)->cancel($sale, 'wrong piece');
+        $titles = $history->forPacket($this->packet)->pluck('title')->implode(' | ');
+        $this->assertStringContainsString('Sale cancelled, back in stock', $titles);
+
+        Livewire::test(PacketDetail::class, ['packet' => $this->packet])->assertSee('Sold (verified): ' . $sold->label)->assertDontSee('Sold from this packet');
+        $this->get(route('stock.items.show', $sold))->assertOk()->assertSee('History');
     }
 
     public function test_a_container_with_only_sold_pieces_is_not_empty_and_so_is_not_offered_for_deletion(): void

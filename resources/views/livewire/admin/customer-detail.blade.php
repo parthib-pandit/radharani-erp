@@ -125,8 +125,8 @@
     <x-ui.modal wire:model="showAdvance" title="Receive an advance" subtitle="Money paid in with no order behind it. It stays on the account until a sale uses it." icon="coins" max-width="md" submit="receiveAdvance">
         <div class="space-y-4">
             <div class="grid grid-cols-2 gap-3">
-                <x-ui.field label="Amount (₹)" for="adv-amount" error="advanceAmount"><input id="adv-amount" type="number" step="0.01" min="0" wire:model="advanceAmount" class="rj-input tabular @error('advanceAmount') is-invalid @enderror" autofocus></x-ui.field>
-                <x-ui.field label="Paid by" for="adv-mode" error="advanceMode"><select id="adv-mode" wire:model="advanceMode" class="rj-select">@foreach (\App\Models\Customer\CustomerAdvance::MODES as $v => $l)<option value="{{ $v }}">{{ $l }}</option>@endforeach</select></x-ui.field>
+                <x-ui.field label="Amount (₹)" for="adv-amount" error="advanceAmount"><input id="adv-amount" type="text" inputmode="decimal" autocomplete="off" wire:model="advanceAmount" class="rj-input tabular @error('advanceAmount') is-invalid @enderror" autofocus></x-ui.field>
+                <x-ui.field label="Paid by" for="adv-mode" error="advanceMode"><x-ui.mode-picker model="advanceMode" :value="$advanceMode" :modes="\App\Models\Customer\CustomerAdvance::NEW_MODES" /></x-ui.field>
             </div>
             <x-ui.field label="Occasion" for="adv-occ" error="advanceOccasion" optional hint="For example Halkhata."><input id="adv-occ" type="text" wire:model="advanceOccasion" maxlength="80" class="rj-input"></x-ui.field>
             <x-ui.field label="Note" for="adv-note" error="advanceNote" optional><input id="adv-note" type="text" wire:model="advanceNote" maxlength="255" class="rj-input"></x-ui.field>

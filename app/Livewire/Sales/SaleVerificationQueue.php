@@ -74,7 +74,10 @@ class SaleVerificationQueue extends Component
         // A sale that delivers a custom order completes that order.
         \App\Models\Orders\Order::where('converted_sale_id', $sale->id)->whereIn('status', ['placed', 'confirmed', 'ready'])->get()->each->update(['status' => 'delivered']);
 
-        MessageTemplates::queue('sale_confirmation', $sale->customer, MessageTemplates::saleConfirmation($sale->fresh('payments')), 'sale', $sale->id);
+        // The walk-in customer has no number to send a confirmation to.
+        if (! $sale->customer?->is_walk_in) {
+            MessageTemplates::queue('sale_confirmation', $sale->customer, MessageTemplates::saleConfirmation($sale->fresh('payments')), 'sale', $sale->id);
+        }
 
         $this->showVerify = false;
         $this->dispatch('toast', message: "Sale verified as Tally bill {$this->tallyNumber}.", type: 'success');

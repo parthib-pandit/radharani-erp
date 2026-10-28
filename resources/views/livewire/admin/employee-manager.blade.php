@@ -75,7 +75,7 @@
             <x-ui.field label="Salary (₹)" for="em-salary" optional error="salary">
                 <div class="rj-input-icon">
                     <x-ui.icon name="coins" :size="16" />
-                    <input id="em-salary" type="number" step="0.01" class="rj-input tabular" wire:model="salary">
+                    <input id="em-salary" type="text" inputmode="decimal" autocomplete="off" class="rj-input tabular" wire:model="salary">
                 </div>
             </x-ui.field>
             <x-ui.field label="Joining date" for="em-joined" optional error="joining_date">

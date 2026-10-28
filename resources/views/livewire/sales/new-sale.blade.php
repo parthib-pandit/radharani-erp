@@ -1,5 +1,5 @@
 <div>
-    <x-ui.page-header title="New Sale" subtitle="Customer, items, charges, payment, then review. You can go back to any step."
+    <x-ui.page-header title="New Sale" subtitle="Items, this bill, customer, payment, then review. You can go back to any step."
         :crumbs="[['label' => 'Sales & Billing', 'href' => route('sales.history')], ['label' => 'New Sale']]">
         <x-slot:actions>
             <x-ui.button variant="ghost" icon="x-circle" x-on:click="$dispatch('rj-confirm', { title: 'Cancel this sale?', message: 'Nothing has been saved yet. What you entered on this bill is thrown away.', confirm: 'Cancel the sale', tone: 'danger', action: () => $wire.cancelDraft() })">Cancel sale</x-ui.button>
@@ -23,55 +23,73 @@
         @endif
     @endif
 
-    @if ($step === 1 && $cart)
-        <div class="mb-6 flex items-center gap-3 p-4 rounded-card border bg-gold-tint/60 border-gold-soft text-[13px]">
-            <x-ui.icon name="gem" :size="16" class="text-gold-dark shrink-0" />
-            <span>On this bill:
-                @foreach ($cart as $line)<strong class="rj-code">{{ $line['label'] }}</strong> <span class="text-ink_text-secondary">{{ $line['category'] }} · {{ number_format($line['weight_listed'], 3) }} g</span>{{ ! $loop->last ? ', ' : '' }}@endforeach.
-                Choose the customer to go on.</span>
-        </div>
-    @endif
-
     <x-ui.stepper :steps="$steps" :current="$step" :reach="$reach" />
 
-    <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
+    @if ($step === 2)
         <div class="min-w-0">
-            {{-- ============================================== 1. CUSTOMER --}}
-            @if ($step === 1)
-                <x-ui.card title="Who is buying" icon="user">
-                    @if ($customer)
-                        <div class="flex items-center gap-3 p-4 rounded-xl bg-gold-tint/50 ring-1 ring-inset ring-gold-soft/60">
-                            <span class="w-10 h-10 rounded-full gold-sheen text-white flex items-center justify-center font-semibold">{{ mb_substr($customer->name, 0, 1) }}</span>
-                            <div class="flex-1"><div class="font-semibold text-ink_text-primary">{{ $customer->name }}</div><div class="text-[12.5px] text-ink_text-secondary tabular">{{ $customer->phone }}</div></div>
-                            <x-ui.button variant="ghost" size="sm" wire:click="clearCustomer">Change</x-ui.button>
-                        </div>
-                    @else
-                        <div class="rj-input-icon">
-                            <x-ui.icon name="search" :size="16" />
-                            <input id="sale-customer" type="text" wire:model.live.debounce.250ms="customerSearch" placeholder="Search by name or phone" class="rj-input" autocomplete="off" autofocus>
-                        </div>
-                        @if ($customerResults->isNotEmpty())
-                            <ul class="mt-2 rounded-xl border border-line-light divide-y divide-line-light overflow-hidden">
-                                @foreach ($customerResults as $c)
-                                    <li><button type="button" wire:click="chooseCustomer({{ $c->id }})" class="w-full text-left px-4 py-2.5 hover:bg-surface-sunken flex justify-between"><span class="font-semibold">{{ $c->name }}</span><span class="text-ink_text-muted tabular">{{ $c->phone }}</span></button></li>
-                                @endforeach
-                            </ul>
-                        @endif
-                        <div class="mt-3"><x-ui.button variant="secondary" size="sm" icon="plus" x-on:click="Livewire.dispatch('open-customer-form', { name: $wire.customerSearch })">New customer</x-ui.button></div>
-                    @endif
-                    @error('customerId')<p class="rj-error"><x-ui.icon name="alert-triangle" :size="12" />{{ $message }}</p>@enderror
+            {{-- ============================================== 2. THIS BILL (full screen) --}}
+            @if ($step === 2)
+                <x-ui.card title="This bill" subtitle="Every piece with its price, then the charges, the round off and the discount." icon="receipt">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                        @foreach ($cart as $id => $line)
+                            @include('livewire.sales.partials.piece-breakup', ['line' => $line, 'id' => $id])
+                        @endforeach
+                    </div>
 
-                    <div class="mt-6 pt-5 border-t border-line-light">
-                        <x-ui.field label="Referral code" for="sale-ref" error="referralCode" optional hint="If this customer was referred by someone, enter that person's code.">
-                            <input id="sale-ref" type="text" wire:model.live.debounce.400ms="referralCode" class="rj-input rj-code uppercase max-w-[220px] @error('referralCode') is-invalid @enderror" autocomplete="off">
-                        </x-ui.field>
-                        @if ($referrer)<p class="text-[12.5px] text-success mt-2 flex items-center gap-1.5"><x-ui.icon name="check-circle" :size="13" /> Referred by {{ $referrer->name }}</p>@endif
+                    <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-6">
+                        <div>
+                            <h3 class="text-[13px] font-bold mb-1">Additional charges</h3>
+                            <p class="rj-help !mt-0 mb-2.5">Added after GST, so they are not taxed.</p>
+                            @foreach ($extras as $i => $e)
+                                <div class="flex gap-2 mb-2" wire:key="ex-{{ $i }}">
+                                    <input type="text" wire:model.live.debounce.300ms="extras.{{ $i }}.name" list="rj-charge-names" placeholder="What for, e.g. Sakha" class="rj-input flex-1" maxlength="60" aria-label="Charge name" autocomplete="off">
+                                    <input type="text" inputmode="decimal" wire:model.live.debounce.300ms="extras.{{ $i }}.amount" placeholder="₹" class="rj-input tabular w-[130px] @error('extras.' . $i . '.amount') is-invalid @enderror" aria-label="Charge amount" autocomplete="off">
+                                    <x-ui.button variant="ghost" size="icon-sm" icon="x" wire:click="removeExtra({{ $i }})" aria-label="Remove charge" />
+                                </div>
+                                @if (! empty($e['item_id']) && isset($cart[$e['item_id']]))<p class="-mt-1 mb-2 text-[11.5px] text-ink_text-muted">Comes with {{ $cart[$e['item_id']]['label'] }}. You can change or remove it.</p>@endif
+                                @error('extras.' . $i . '.amount')<p class="rj-error">{{ $message }}</p>@enderror
+                            @endforeach
+                            <datalist id="rj-charge-names">@foreach ($chargeNames as $cn)<option value="{{ $cn }}">@endforeach</datalist>
+                            <x-ui.button variant="secondary" size="sm" icon="plus" wire:click="addExtra">Add a charge</x-ui.button>
+
+                            <x-ui.field label="Notes" for="sale-notes" optional class="mt-5"><input id="sale-notes" type="text" wire:model="notes" maxlength="255" class="rj-input"></x-ui.field>
+                        </div>
+
+                        <div>
+                            <dl class="space-y-2 text-[13.5px]">
+                                <div class="flex justify-between"><dt class="text-ink_text-secondary">Pieces ({{ count($cart) }})</dt><dd class="tabular">₹{{ number_format($gst['pieces'], 2) }}</dd></div>
+                                @if ($gst['gst_jewellery'] > 0)<div class="flex justify-between"><dt class="text-ink_text-secondary">GST {{ rtrim(rtrim(number_format($gst['rates'][0], 2), '0'), '.') }}% on jewellery</dt><dd class="tabular">₹{{ number_format($gst['gst_jewellery'], 2) }}</dd></div>@endif
+                                @if ($gst['gst_hallmark'] > 0)<div class="flex justify-between"><dt class="text-ink_text-secondary">GST {{ rtrim(rtrim(number_format($gst['rates'][1], 2), '0'), '.') }}% on hallmarking</dt><dd class="tabular">₹{{ number_format($gst['gst_hallmark'], 2) }}</dd></div>@endif
+                                @if ($gst['extras'] > 0)<div class="flex justify-between"><dt class="text-ink_text-secondary">Additional charges</dt><dd class="tabular">₹{{ number_format($gst['extras'], 2) }}</dd></div>@endif
+                                <div class="flex justify-between"><dt class="text-ink_text-secondary">Round off <span class="text-[11.5px]">(automatic, to a whole rupee)</span></dt><dd class="tabular">{{ $gst['round_off'] >= 0 ? '+' : '-' }} ₹{{ number_format(abs($gst['round_off']), 2) }}</dd></div>
+                                <div class="flex justify-between pt-2 border-t border-line-light font-semibold"><dt>Total before discount</dt><dd class="tabular">₹{{ number_format($gst['rounded_gross'], 2) }}</dd></div>
+                            </dl>
+
+                            <div class="mt-4 flex gap-2">
+                                <select wire:model.live="finalType" class="rj-select w-auto" aria-label="Discount type"><option value="flat">Discount amount</option><option value="final">Final price to pay</option></select>
+                                <input type="text" inputmode="decimal" wire:model.live.debounce.400ms="finalValue" class="rj-input tabular flex-1 @error('finalValue') is-invalid @enderror" placeholder="Discount ₹" aria-label="Discount value" autocomplete="off">
+                            </div>
+                            @error('finalValue')<p class="rj-error mt-1">{{ $message }}</p>@enderror
+                            <p class="rj-help">For example the customer will pay 14,500 on a bill of 14,576: type 76, or choose final price and type 14,500. It can not be more than ₹{{ number_format($gst['final_discount_cap'], 2) }}, the making charge left on this bill with its GST. No approval needed.</p>
+                            @if ($gst['final_discount'] > 0)
+                                <div class="mt-3 flex justify-between text-[14px] font-semibold text-success"><span>Discount</span><span class="tabular">- ₹{{ number_format($gst['final_discount'], 2) }}</span></div>
+                            @endif
+                            <div class="mt-3 pt-3 border-t border-line-light flex justify-between font-display text-[28px] font-semibold"><span>Total</span><span class="tabular">₹{{ number_format($this->total, 2) }}</span></div>
+                        </div>
                     </div>
                 </x-ui.card>
             @endif
 
-            {{-- ============================================== 2. ITEMS --}}
-            @if ($step === 2)
+            <div class="flex justify-between mt-5">
+                <x-ui.button variant="secondary" icon="arrow-left" wire:click="goToStep({{ max(1, $step - 1) }})" :disabled="$step === 1">Back</x-ui.button>
+                @if ($step < 5)<x-ui.button iconRight="arrow-right" wire:click="next" target="next">Continue</x-ui.button>@endif
+            </div>
+        </div>
+    @else
+    <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-6 items-start">
+        <div class="min-w-0">
+            {{-- ============================================== 1. ITEMS --}}
+            @if ($step === 1)
                 <x-ui.card title="What is being sold" subtitle="Scan or search. The price comes from today's rate and the pricing rules." icon="gem">
                     <form class="flex gap-2.5" x-on:submit.prevent="const v = $refs.scan.value; $refs.scan.value = ''; if (v.trim()) $wire.addByCode(v)">
                         <div class="rj-input-icon flex-1">
@@ -109,7 +127,7 @@
                                 <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                                     <div>
                                         <label for="w-{{ $id }}" class="block text-[12px] font-semibold text-ink_text-secondary mb-1">Weight to price (g)</label>
-                                        <input id="w-{{ $id }}" type="number" step="0.001" min="0" wire:model.live.blur="cart.{{ $id }}.weight_input" placeholder="{{ number_format($line['weight_listed'], 3, '.', '') }}"
+                                        <input id="w-{{ $id }}" type="text" wire:model.live.blur="cart.{{ $id }}.weight_input" placeholder="{{ number_format($line['weight_listed'], 3, '.', '') }}"
                                             class="rj-input rj-input-sm tabular @error('cart.' . $id . '.weight_input') is-invalid @enderror @if ($weightChanged) !border-warning @endif" inputmode="decimal">
                                         @error('cart.' . $id . '.weight_input')<p class="rj-error">{{ $message }}</p>@enderror
                                         @if ($weightChanged)
@@ -126,16 +144,16 @@
                                         </div>
                                         @if ($line['making_default'] > 0)
                                             <div class="flex items-center gap-2" wire:key="mk-{{ $id }}-{{ $line['making_rate'] }}-{{ $line['making'] }}">
-                                                <input type="number" step="0.01" value="{{ $line['making_rate'] }}" min="{{ $line['making_min'] }}" max="{{ $line['making_default'] }}" @disabled(! $canBargain)
+                                                <input type="text" value="{{ $line['making_rate'] }}" @disabled(! $canBargain)
                                                     x-on:change="$wire.setMaking({{ $id }}, 'rate', $event.target.value)" class="rj-input rj-input-sm tabular w-[84px]" aria-label="Making rate ({{ $unit }})" inputmode="decimal">
                                                 <span class="text-[12px] text-ink_text-muted shrink-0">{{ $unit }}</span>
                                                 <span class="text-ink_text-muted">=</span>
-                                                <input type="number" step="0.01" value="{{ number_format($line['making'], 2, '.', '') }}" @disabled(! $canBargain)
+                                                <input type="text" value="{{ number_format($line['making'], 2, '.', '') }}" @disabled(! $canBargain)
                                                     x-on:change="$wire.setMaking({{ $id }}, 'amount', $event.target.value)" class="rj-input rj-input-sm tabular flex-1 min-w-[90px]" aria-label="Making charge (₹)" inputmode="decimal">
                                             </div>
                                             @if ($canBargain)
                                                 <div x-data="{ r: {{ $line['making_rate'] }} }" wire:key="mks-{{ $id }}-{{ $line['making_rate'] }}" class="mt-2">
-                                                    <input type="range" min="{{ $line['making_min'] }}" max="{{ $line['making_default'] }}" step="{{ $kind === 'percentage' ? 0.1 : 1 }}" x-model.number="r"
+                                                    <input type="range" min="{{ $line['making_min'] }}" max="{{ $line['making_default'] }}" step="{{ $kind === 'percentage' ? 0.25 : ($kind === 'per_gram' ? 1 : 5) }}" x-model.number="r"
                                                         x-on:change="$wire.setMaking({{ $id }}, 'rate', r)" class="w-full accent-gold" aria-label="Making charge slider">
                                                     <div class="flex justify-between text-[11px] text-ink_text-muted tabular">
                                                         <span>{{ rtrim(rtrim(number_format($line['making_min'], 2), '0'), '.') }}{{ $unit === '%' ? '%' : '' }}</span>
@@ -152,12 +170,6 @@
                                         @endif
                                     </div>
                                 </div>
-                                @if ($line['inVault'])
-                                    <div class="mt-2.5 flex flex-wrap items-center gap-3 px-3 py-2 rounded-lg bg-warning-bg text-warning text-[12.5px]">
-                                        <x-ui.icon name="alert-triangle" :size="14" /> <span class="flex-1">Recorded as in the vault. It has to be at the counter before it can be sold.</span>
-                                        <x-ui.button size="xs" variant="secondary" wire:click="moveToCounter({{ $id }})" target="moveToCounter">Move to counter</x-ui.button>
-                                    </div>
-                                @endif
                                 @if ($line['order'])
                                     <div class="mt-2.5 flex items-center gap-2 px-3 py-2 rounded-lg bg-info-bg text-info text-[12.5px]"><x-ui.icon name="clipboard" :size="14" /> Held for a customer: {{ $line['order'] }}.</div>
                                 @endif
@@ -181,41 +193,47 @@
                 </x-ui.card>
             @endif
 
-            {{-- ============================================== 3. CHARGES --}}
+            {{-- ============================================== 3. CUSTOMER --}}
             @if ($step === 3)
-                <x-ui.card title="Additional charges" subtitle="Added after GST, so they are not taxed." icon="receipt">
-                    <h3 class="text-[13px] font-bold mb-2">Additional charges on this sale</h3>
-                    @foreach ($extras as $i => $e)
-                        <div class="flex gap-2 mb-2" wire:key="ex-{{ $i }}">
-                            <input type="text" wire:model.live.debounce.300ms="extras.{{ $i }}.name" list="rj-charge-names" placeholder="What for, e.g. Sakha" class="rj-input flex-1" maxlength="60" aria-label="Charge name" autocomplete="off">
-                            <input type="number" step="0.01" min="0" wire:model.live.debounce.300ms="extras.{{ $i }}.amount" placeholder="₹" class="rj-input tabular w-[130px] @error('extras.' . $i . '.amount') is-invalid @enderror" aria-label="Charge amount">
-                            <x-ui.button variant="ghost" size="icon-sm" icon="x" wire:click="removeExtra({{ $i }})" aria-label="Remove charge" />
+                <x-ui.card title="Who is buying" icon="user">
+                    @if ($customer)
+                        <div class="flex items-center gap-3 p-4 rounded-xl bg-gold-tint/50 ring-1 ring-inset ring-gold-soft/60">
+                            <span class="w-10 h-10 rounded-full gold-sheen text-white flex items-center justify-center font-semibold">{{ mb_substr($customer->name, 0, 1) }}</span>
+                            <div class="flex-1"><div class="font-semibold text-ink_text-primary">{{ $customer->name }}</div><div class="text-[12.5px] text-ink_text-secondary tabular">{{ $customer->is_walk_in ? 'No details taken' : $customer->phone }}</div></div>
+                            <x-ui.button variant="ghost" size="sm" wire:click="clearCustomer">Change</x-ui.button>
                         </div>
-                        @if (! empty($e['item_id']) && isset($cart[$e['item_id']]))<p class="-mt-1 mb-2 text-[11.5px] text-ink_text-muted">Comes with {{ $cart[$e['item_id']]['label'] }}. You can change or remove it.</p>@endif
-                        @error('extras.' . $i . '.amount')<p class="rj-error">{{ $message }}</p>@enderror
-                    @endforeach
-                    <datalist id="rj-charge-names">@foreach ($chargeNames as $cn)<option value="{{ $cn }}">@endforeach</datalist>
-                    <x-ui.button variant="secondary" size="sm" icon="plus" wire:click="addExtra">Add a charge</x-ui.button>
-
-                    <x-ui.field label="Notes" for="sale-notes" optional class="mt-5"><input id="sale-notes" type="text" wire:model="notes" maxlength="255" class="rj-input"></x-ui.field>
-                </x-ui.card>
-
-                <x-ui.card title="Round off and discount" subtitle="The bill is rounded to a whole rupee first. A bargain discount comes off after that." icon="coins" class="mt-5">
-                    <dl class="space-y-1.5 text-[13.5px] max-w-[420px]">
-                        <div class="flex justify-between"><dt class="text-ink_text-secondary">Bill with GST and additional charges</dt><dd class="tabular">₹{{ number_format($gst['gross'], 2) }}</dd></div>
-                        <div class="flex justify-between"><dt class="text-ink_text-secondary">Round off (automatic)</dt><dd class="tabular">{{ $gst['round_off'] >= 0 ? '+' : '-' }} ₹{{ number_format(abs($gst['round_off']), 2) }}</dd></div>
-                        <div class="flex justify-between pt-1.5 border-t border-line-light font-semibold"><dt>Total before discount</dt><dd class="tabular">₹{{ number_format($gst['rounded_gross'], 2) }}</dd></div>
-                    </dl>
-                    <div class="mt-4 flex gap-2 max-w-[420px]">
-                        <select wire:model.live="finalType" class="rj-select w-auto" aria-label="Discount type"><option value="flat">Discount amount</option><option value="final">Final price to pay</option></select>
-                        <input type="number" step="0.01" min="0" wire:model.live.debounce.400ms="finalValue" class="rj-input tabular flex-1 @error('finalValue') is-invalid @enderror" placeholder="₹" aria-label="Discount value" inputmode="decimal">
-                    </div>
-                    @error('finalValue')<p class="rj-error mt-1">{{ $message }}</p>@enderror
-                    <p class="rj-help">For example the customer will pay 14,500 on a bill of 14,576: type 76, or choose final price and type 14,500. It can not be more than ₹{{ number_format($gst['final_discount_cap'], 2) }}, the making charge left on this bill with its GST. No approval needed.</p>
-                    @if ($gst['final_discount'] > 0)
-                        <div class="mt-3 flex justify-between max-w-[420px] text-[14px] font-semibold text-success"><span>Discount</span><span class="tabular">- ₹{{ number_format($gst['final_discount'], 2) }}</span></div>
+                    @else
+                        @if ($walkIn)
+                            <button type="button" wire:click="chooseWalkIn" class="press w-full flex items-center gap-3 p-4 rounded-xl border border-line bg-white hover:border-line-strong hover:bg-surface-sunken text-left">
+                                <span class="w-10 h-10 rounded-full bg-gold-tint text-gold-dark flex items-center justify-center shrink-0"><x-ui.icon name="user" :size="18" /></span>
+                                <span class="flex-1 min-w-0"><span class="block font-semibold text-ink_text-primary">{{ $walkIn->name }}</span><span class="block text-[12.5px] text-ink_text-secondary">For a buyer who gives no details. It has its own ledger.</span></span>
+                                <x-ui.icon name="chevron-right" :size="16" class="text-ink_text-muted" />
+                            </button>
+                            <div class="my-4 flex items-center gap-3 text-[12px] text-ink_text-muted"><span class="flex-1 h-px bg-line-light"></span>or find a customer<span class="flex-1 h-px bg-line-light"></span></div>
+                        @endif
+                        <div class="rj-input-icon">
+                            <x-ui.icon name="search" :size="16" />
+                            <input id="sale-customer" type="text" wire:model.live.debounce.250ms="customerSearch" placeholder="Search by name or phone" class="rj-input" autocomplete="off">
+                        </div>
+                        @if ($customerResults->isNotEmpty())
+                            <ul class="mt-2 rounded-xl border border-line-light divide-y divide-line-light overflow-hidden">
+                                @foreach ($customerResults as $c)
+                                    <li><button type="button" wire:click="chooseCustomer({{ $c->id }})" class="w-full text-left px-4 py-2.5 hover:bg-surface-sunken flex justify-between"><span class="font-semibold">{{ $c->name }}</span><span class="text-ink_text-muted tabular">{{ $c->phone }}</span></button></li>
+                                @endforeach
+                            </ul>
+                        @endif
+                        <div class="mt-3"><x-ui.button variant="secondary" size="sm" icon="plus" x-on:click="Livewire.dispatch('open-customer-form', { name: $wire.customerSearch })">New customer</x-ui.button></div>
                     @endif
-                    <div class="mt-3 pt-3 border-t border-line-light flex justify-between max-w-[420px] font-display text-[22px] font-semibold"><span>Total</span><span class="tabular">₹{{ number_format($this->total, 2) }}</span></div>
+                    @error('customerId')<p class="rj-error"><x-ui.icon name="alert-triangle" :size="12" />{{ $message }}</p>@enderror
+
+                    @unless ($customer?->is_walk_in)
+                        <div class="mt-6 pt-5 border-t border-line-light">
+                            <x-ui.field label="Referral code" for="sale-ref" error="referralCode" optional hint="If this customer was referred by someone, enter that person's code.">
+                                <input id="sale-ref" type="text" wire:model.live.debounce.400ms="referralCode" class="rj-input rj-code uppercase max-w-[220px] @error('referralCode') is-invalid @enderror" autocomplete="off">
+                            </x-ui.field>
+                            @if ($referrer)<p class="text-[12.5px] text-success mt-2 flex items-center gap-1.5"><x-ui.icon name="check-circle" :size="13" /> Referred by {{ $referrer->name }}</p>@endif
+                        </div>
+                    @endunless
                 </x-ui.card>
             @endif
 
@@ -224,16 +242,15 @@
                 <x-ui.card title="Payment" subtitle="A bill can be paid in parts. Anything left stays as the balance." icon="coins">
                     <div class="space-y-2">
                         @foreach ($payments as $i => $p)
-                            <div class="flex gap-2 items-start" wire:key="pay-{{ $i }}">
+                            <div class="flex flex-wrap gap-2 items-center" wire:key="pay-{{ $i }}">
                                 @if (($p['mode'] ?? '') === 'exchange' || ($p['mode'] ?? '') === 'advance')
                                     <span class="rj-select w-[130px] flex items-center text-[13px] bg-gold-tint/50 !cursor-default">{{ $p['mode'] === 'advance' ? 'Advance' : 'Exchange credit' }}</span>
+                                @elseif (! array_key_exists($p['mode'] ?? '', $modes))
+                                    <span class="rj-select w-[130px] flex items-center text-[13px] bg-surface-muted !cursor-default" title="Taken before cash and bank were the only choices">{{ $modeLabels[$p['mode']] ?? $p['mode'] }}</span>
                                 @else
-                                    <select wire:model.live="payments.{{ $i }}.mode" class="rj-select w-[130px]" aria-label="Payment mode">@foreach ($modes as $v => $l)<option value="{{ $v }}">{{ $l }}</option>@endforeach</select>
+                                    <x-ui.mode-picker :model="'payments.' . $i . '.mode'" :value="$p['mode'] ?? 'cash'" :modes="$modes" />
                                 @endif
-                                <input type="number" step="0.01" min="0" wire:model.live.debounce.300ms="payments.{{ $i }}.amount" placeholder="₹" class="rj-input tabular flex-1 @error('payments.' . $i . '.amount') is-invalid @enderror" aria-label="Amount">
-                                @if (($p['mode'] ?? '') === 'cheque')
-                                    <input type="text" wire:model="payments.{{ $i }}.note" maxlength="120" placeholder="Cheque no. and bank" class="rj-input w-[190px]" aria-label="Cheque details">
-                                @endif
+                                <input type="text" inputmode="decimal" wire:model.live.debounce.300ms="payments.{{ $i }}.amount" placeholder="₹" class="rj-input h-11 tabular flex-1 @error('payments.' . $i . '.amount') is-invalid @enderror" aria-label="Amount" autocomplete="off">
                                 <x-ui.button variant="secondary" size="sm" wire:click="fillBalance({{ $i }})">Rest</x-ui.button>
                                 @if (count($payments) > 1)<x-ui.button variant="ghost" size="icon-sm" icon="x" wire:click="removePayment({{ $i }})" aria-label="Remove payment" />@endif
                             </div>
@@ -263,25 +280,11 @@
             {{-- ============================================== 5. REVIEW --}}
             @if ($step === 5)
                 <x-ui.card title="Review" subtitle="Check it, then save. An admin verifies it before it is final." icon="check-circle">
-                    <dl class="rj-dl mb-4"><div><dt>Customer</dt><dd>{{ $customer?->name }} · <span class="tabular">{{ $customer?->phone }}</span></dd></div>
+                    <dl class="rj-dl mb-4"><div><dt>Customer</dt><dd>{{ $customer?->name }}@unless ($customer?->is_walk_in) · <span class="tabular">{{ $customer?->phone }}</span>@endunless</dd></div>
                         @if ($referrer)<div><dt>Referred by</dt><dd>{{ $referrer->name }}</dd></div>@endif</dl>
                     <div class="space-y-3">
                         @foreach ($cart as $id => $line)
-                            <div class="rounded-xl ring-1 ring-inset ring-line-light p-3.5" wire:key="rv-{{ $id }}">
-                                <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                                    <div><span class="rj-code text-ink_text-primary">{{ $line['label'] }}</span> <span class="text-[12.5px] text-ink_text-muted">{{ $line['category'] }}</span></div>
-                                    <div class="text-[12.5px] tabular text-ink_text-secondary">{{ number_format($line['weight'], 3) }} g
-                                        @if (abs($line['weight'] - $line['weight_listed']) > 0.0004)<span class="text-warning font-semibold"> (record {{ number_format($line['weight_listed'], 3) }} g)</span>@endif</div>
-                                </div>
-                                @if (abs($line['weight'] - $line['weight_listed']) > 0.0004 && trim($line['weight_note']) !== '')<p class="text-[12px] text-ink_text-muted mt-0.5">Weight: {{ $line['weight_note'] }}</p>@endif
-                                <div class="mt-2 space-y-1 text-[12.5px]">
-                                    @foreach ($line['breakup'] ?? [] as $bl)
-                                        <div class="flex justify-between gap-3"><span>{{ $bl['label'] }}@if ($bl['note'])<span class="text-ink_text-muted text-[11.5px]"> · {{ $bl['note'] }}</span>@endif</span><span class="tabular whitespace-nowrap {{ $bl['amount'] < 0 ? 'text-success' : '' }}">{{ $bl['amount'] < 0 ? '- ' : '' }}₹{{ number_format(abs($bl['amount']), 2) }}</span></div>
-                                    @endforeach
-                                    @if ($line['making_saved'] > 0)<div class="text-danger font-semibold text-[12px]">Making charge reduced by ₹{{ number_format($line['making_saved'], 2) }}</div>@endif
-                                    <div class="flex justify-between gap-3 pt-1 border-t border-line-light font-semibold"><span>Piece price before GST</span><span class="tabular">₹{{ number_format($line['price'], 2) }}</span></div>
-                                </div>
-                            </div>
+                            @include('livewire.sales.partials.piece-breakup', ['line' => $line, 'id' => $id])
                         @endforeach
                     </div>
                     <dl class="mt-4 space-y-1.5 text-[13.5px] max-w-[360px] ml-auto">
@@ -295,7 +298,10 @@
                     </dl>
                     @if ($hasOrderWarning)<p class="text-[12.5px] text-info mt-3">Sold over an order hold. Note: {{ $overrideNote }}</p>@endif
                     @error('cart')<p class="rj-error mt-3">{{ $message }}</p>@enderror
-                    <x-ui.button size="lg" icon="check" class="w-full mt-5" wire:click="submit" target="submit">Save sale</x-ui.button>
+                    <div x-data="{ copied: false, text: @js($copyText), async copy() { try { await navigator.clipboard.writeText(this.text); } catch (e) { const a = document.createElement('textarea'); a.value = this.text; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); } catch (e2) {} a.remove(); } this.copied = true; setTimeout(() => this.copied = false, 2200); } }" class="mt-5 flex flex-col sm:flex-row gap-2.5">
+                        <x-ui.button size="lg" variant="secondary" icon="copy" class="sm:w-auto" x-on:click="copy()"><span x-text="copied ? 'Copied' : 'Copy details'">Copy details</span></x-ui.button>
+                        <x-ui.button size="lg" icon="check" class="flex-1" wire:click="submit" target="submit">Save sale</x-ui.button>
+                    </div>
                 </x-ui.card>
             @endif
 
@@ -333,6 +339,27 @@
             </dl>
         </x-ui.card>
     </div>
+    @endif
+
+
+    {{-- A piece still in the vault: a popup, and nothing moves until Move to Counter is pressed --}}
+    <x-ui.modal wire:model="showVaultMove" title="Move to Counter" icon="repeat" max-width="md"
+        subtitle="These pieces are recorded as in the vault. They have to be at the counter before they can be sold.">
+        <ul class="divide-y divide-line-light rounded-xl border border-line-light overflow-hidden">
+            @foreach ($vaultPieces as $vp)
+                <li class="flex items-center gap-3 px-3.5 py-2.5" wire:key="vp-{{ $vp['id'] }}"><span class="rj-code">{{ $vp['label'] }}</span><span class="text-[12.5px] text-ink_text-muted">{{ $vp['category'] }}</span></li>
+            @endforeach
+        </ul>
+        @cannot('movement.create')
+            <p class="mt-3 text-[12.5px] text-warning">You can not move stock. Ask someone who can, then come back to this bill.</p>
+        @endcannot
+        <x-slot:footer>
+            <x-ui.button variant="secondary" x-on:click="show = false">Not now</x-ui.button>
+            @can('movement.create')
+                <x-ui.button icon="repeat" wire:click="moveVaultPiecesToCounter" target="moveVaultPiecesToCounter">Move to Counter</x-ui.button>
+            @endcan
+        </x-slot:footer>
+    </x-ui.modal>
 
     <livewire:customers.customer-form />
 </div>

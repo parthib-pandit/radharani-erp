@@ -161,7 +161,7 @@
 
                 <div class="grid grid-cols-1 sm:grid-cols-[120px_minmax(0,1fr)] gap-4 items-end">
                     <x-ui.field label="Order" for="g-order" error="sort_order">
-                        <input id="g-order" type="number" min="0" wire:model="sort_order" class="rj-input tabular">
+                        <input id="g-order" type="text" inputmode="numeric" autocomplete="off" wire:model="sort_order" class="rj-input tabular">
                     </x-ui.field>
                     <div class="flex flex-wrap gap-x-6 gap-y-3 pb-2.5">
                         <label class="inline-flex items-center gap-2.5 text-[13.5px] font-semibold text-ink_text-primary cursor-pointer">

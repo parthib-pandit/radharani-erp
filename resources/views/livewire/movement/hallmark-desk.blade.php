@@ -70,9 +70,9 @@
                         <button type="button" x-show="!more" x-on:click="more = true" class="text-[12.5px] font-semibold text-gold-dark hover:underline">Add more pieces by count</button>
                     @endif
                     <div x-show="more" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                        <x-ui.field label="More pieces" for="hk-pc" error="piecesCounted" optional><input id="hk-pc" type="number" min="0" wire:model="piecesCounted" class="rj-input tabular"></x-ui.field>
-                        <x-ui.field label="Their total weight (g)" for="hk-wc" error="weightCounted" optional><input id="hk-wc" type="number" step="0.001" min="0" wire:model="weightCounted" class="rj-input tabular"></x-ui.field>
-                        <x-ui.field label="To receive a HUID" for="hk-he" error="huidExpected" optional hint="Leave empty if all of them."><input id="hk-he" type="number" min="0" wire:model="huidExpected" class="rj-input tabular"></x-ui.field>
+                        <x-ui.field label="More pieces" for="hk-pc" error="piecesCounted" optional><input id="hk-pc" type="text" inputmode="numeric" autocomplete="off" wire:model="piecesCounted" class="rj-input tabular"></x-ui.field>
+                        <x-ui.field label="Their total weight (g)" for="hk-wc" error="weightCounted" optional><input id="hk-wc" type="text" inputmode="decimal" autocomplete="off" wire:model="weightCounted" class="rj-input tabular"></x-ui.field>
+                        <x-ui.field label="To receive a HUID" for="hk-he" error="huidExpected" optional hint="Leave empty if all of them."><input id="hk-he" type="text" inputmode="numeric" autocomplete="off" wire:model="huidExpected" class="rj-input tabular"></x-ui.field>
                     </div>
                     </div>
                 </section>
@@ -120,7 +120,7 @@
                                             <input type="checkbox" wire:model="lineBack.{{ $l->id }}" class="rj-checkbox" aria-label="Back: {{ $l->item->label }}">
                                             <span class="rj-code truncate">{{ $l->item->label }} <span class="text-ink_text-muted font-sans text-[12px]">{{ $l->item->category }}</span></span>
                                             <div class="relative"><input id="hk-lh-{{ $l->id }}" type="text" wire:model="lineHuid.{{ $l->id }}" placeholder="HUID" maxlength="6" aria-label="HUID" autocomplete="off" class="rj-input pr-11 rj-code uppercase @error('lineHuid.' . $l->id) is-invalid @enderror"><x-ui.scan-button target="#hk-lh-{{ $l->id }}" title="Scan the HUID" class="absolute right-1 top-1/2 -translate-y-1/2 !w-8 !h-8" /></div>
-                                            <input type="number" step="0.001" wire:model="lineWeight.{{ $l->id }}" class="rj-input tabular @error('lineWeight.' . $l->id) is-invalid @enderror" aria-label="Weight">
+                                            <input type="text" inputmode="decimal" autocomplete="off" wire:model="lineWeight.{{ $l->id }}" class="rj-input tabular @error('lineWeight.' . $l->id) is-invalid @enderror" aria-label="Weight">
                                         </div>
                                     @endforeach
                                 </div>
@@ -142,7 +142,7 @@
                                     @foreach ($newRows as $i => $row)
                                         <div class="grid grid-cols-[1fr_1fr_1.4fr_auto] gap-2 items-center" wire:key="nr-{{ $batch->id }}-{{ $i }}">
                                             <div class="relative"><input id="hk-nr-{{ $i }}" type="text" wire:model="newRows.{{ $i }}.huid" maxlength="6" placeholder="HUID, if tagged" aria-label="HUID" autocomplete="off" class="rj-input pr-11 rj-code uppercase"><x-ui.scan-button target="#hk-nr-{{ $i }}" title="Scan the HUID" class="absolute right-1 top-1/2 -translate-y-1/2 !w-8 !h-8" /></div>
-                                            <input type="number" step="0.001" min="0" wire:model="newRows.{{ $i }}.weight" placeholder="Weight (g)" aria-label="Weight" class="rj-input tabular">
+                                            <input type="text" inputmode="decimal" autocomplete="off" wire:model="newRows.{{ $i }}.weight" placeholder="Weight (g)" aria-label="Weight" class="rj-input tabular">
                                             <input type="text" wire:model="newRows.{{ $i }}.desc" maxlength="100" placeholder="Description (optional)" aria-label="Description" class="rj-input">
                                             <button type="button" wire:click="removeRow({{ $i }})" aria-label="Remove this piece" class="w-8 h-8 rounded-lg text-ink_text-muted hover:text-danger hover:bg-danger-bg flex items-center justify-center"><x-ui.icon name="x" :size="15" /></button>
                                         </div>
@@ -157,7 +157,7 @@
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <x-ui.field label="Tagged by" for="hr-tag" error="taggedBy"><input id="hr-tag" type="text" wire:model="taggedBy" maxlength="100" class="rj-input @error('taggedBy') is-invalid @enderror" placeholder="Name at the centre"></x-ui.field>
-                            <x-ui.field label="Weight loss (g)" for="hr-loss" optional hint="Typed in, never worked out."><input id="hr-loss" type="number" step="0.001" min="0" wire:model="lossWeight" class="rj-input tabular"></x-ui.field>
+                            <x-ui.field label="Weight loss (g)" for="hr-loss" optional hint="Typed in, never worked out."><input id="hr-loss" type="text" inputmode="decimal" autocomplete="off" wire:model="lossWeight" class="rj-input tabular"></x-ui.field>
                         </div>
                         <x-ui.field label="Note" for="hr-note" optional><input id="hr-note" type="text" wire:model="receiveNote" maxlength="255" class="rj-input"></x-ui.field>
                         <x-movement.photo-upload :photo="$photo" required label="Photo of what came back" />

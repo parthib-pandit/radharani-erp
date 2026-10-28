@@ -19,10 +19,10 @@
         <x-ui.card title="GST rates" subtitle="What a new bill starts with. Staff can choose another rate, or 0, on each bill." icon="percent" class="max-w-[560px]">
             <form wire:submit="saveGst" class="space-y-4">
                 <x-ui.field label="On the jewellery (%)" for="gst-j" error="gstJewellery" hint="Metal, making (after its discount), stones. Extra charges are not taxed.">
-                    <input id="gst-j" type="number" step="0.01" min="0" max="100" wire:model="gstJewellery" class="rj-input tabular max-w-[160px]">
+                    <input id="gst-j" type="text" inputmode="decimal" autocomplete="off" wire:model="gstJewellery" class="rj-input tabular max-w-[160px]">
                 </x-ui.field>
                 <x-ui.field label="On the hallmarking charge (%)" for="gst-h" error="gstHallmark" hint="The HUID charge only.">
-                    <input id="gst-h" type="number" step="0.01" min="0" max="100" wire:model="gstHallmark" class="rj-input tabular max-w-[160px]">
+                    <input id="gst-h" type="text" inputmode="decimal" autocomplete="off" wire:model="gstHallmark" class="rj-input tabular max-w-[160px]">
                 </x-ui.field>
                 <x-ui.button type="submit" icon="check" target="saveGst">Save rates</x-ui.button>
             </form>
@@ -44,7 +44,7 @@
                                 <select wire:model="categoryMaking.{{ $c->id }}.calc" class="rj-select w-auto" aria-label="Type for {{ $c->name }}">
                                     @foreach ($calcLabels as $v => $l)<option value="{{ $v }}">{{ $l }}</option>@endforeach
                                 </select>
-                                <input type="number" step="0.01" min="0" wire:model="categoryMaking.{{ $c->id }}.value" class="rj-input tabular w-[110px] @error('categoryMaking.' . $c->id . '.value') is-invalid @enderror" aria-label="Value for {{ $c->name }}" placeholder="Value">
+                                <input type="text" inputmode="decimal" autocomplete="off" wire:model="categoryMaking.{{ $c->id }}.value" class="rj-input tabular w-[110px] @error('categoryMaking.' . $c->id . '.value') is-invalid @enderror" aria-label="Value for {{ $c->name }}" placeholder="Value">
                                 <x-ui.button size="sm" variant="secondary" wire:click="saveCategoryMaking({{ $c->id }})" target="saveCategoryMaking">Save</x-ui.button>
                             </li>
                         @endforeach
@@ -104,14 +104,14 @@
                 </x-ui.field>
             @elseif ($scope === 'weight_range')
                 <div class="grid grid-cols-2 gap-4">
-                    <x-ui.field label="Weight from (g)" for="pr-wmin" error="minWeight" optional><input id="pr-wmin" type="number" step="0.001" min="0" wire:model="minWeight" class="rj-input tabular"></x-ui.field>
-                    <x-ui.field label="Up to (g)" for="pr-wmax" error="maxWeight" optional><input id="pr-wmax" type="number" step="0.001" min="0" wire:model="maxWeight" class="rj-input tabular"></x-ui.field>
+                    <x-ui.field label="Weight from (g)" for="pr-wmin" error="minWeight" optional><input id="pr-wmin" type="text" inputmode="decimal" autocomplete="off" wire:model="minWeight" class="rj-input tabular"></x-ui.field>
+                    <x-ui.field label="Up to (g)" for="pr-wmax" error="maxWeight" optional><input id="pr-wmax" type="text" inputmode="decimal" autocomplete="off" wire:model="maxWeight" class="rj-input tabular"></x-ui.field>
                 </div>
                 <p class="rj-help -mt-2">The weight of the piece (net weight when it is known). The bottom is included and the top is not, so 5 to 10 g takes 5 g and 9.99 g but not 10 g. Leave one end empty for "or more" or "up to".</p>
             @elseif ($scope === 'price_range')
                 <div class="grid grid-cols-2 gap-4">
-                    <x-ui.field label="Metal value from (₹)" for="pr-min" error="minValue" optional><input id="pr-min" type="number" step="1" min="0" wire:model="minValue" class="rj-input tabular"></x-ui.field>
-                    <x-ui.field label="Up to (₹)" for="pr-max" error="maxValue" optional><input id="pr-max" type="number" step="1" min="0" wire:model="maxValue" class="rj-input tabular"></x-ui.field>
+                    <x-ui.field label="Metal value from (₹)" for="pr-min" error="minValue" optional><input id="pr-min" type="text" inputmode="numeric" autocomplete="off" wire:model="minValue" class="rj-input tabular"></x-ui.field>
+                    <x-ui.field label="Up to (₹)" for="pr-max" error="maxValue" optional><input id="pr-max" type="text" inputmode="numeric" autocomplete="off" wire:model="maxValue" class="rj-input tabular"></x-ui.field>
                 </div>
                 <p class="rj-help -mt-2">The price range is the metal value alone (net weight times the carat's rate), never the final price. The same piece can move to another range when the rate changes.</p>
             @endif
@@ -133,7 +133,7 @@
                 <x-ui.field label="Charged as" for="pr-calc" error="calc">
                     <select id="pr-calc" wire:model="calc" class="rj-select">@foreach ($calcLabels as $v => $l)<option value="{{ $v }}">{{ $l }}{{ $v === 'percentage' ? ($kind === 'discount' ? ' of the price' : ' of the metal value') : '' }}</option>@endforeach</select>
                 </x-ui.field>
-                <x-ui.field label="Value" for="pr-value" error="value"><input id="pr-value" type="number" step="0.01" min="0" wire:model="value" class="rj-input tabular"></x-ui.field>
+                <x-ui.field label="Value" for="pr-value" error="value"><input id="pr-value" type="text" inputmode="decimal" autocomplete="off" wire:model="value" class="rj-input tabular"></x-ui.field>
             </div>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">

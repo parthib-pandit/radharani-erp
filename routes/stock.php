@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Livewire\Stock\BoxManager;
 use App\Livewire\Stock\ContainerList;
+use App\Livewire\Stock\CategoryDetail;
 use App\Livewire\Stock\CategoryTree;
 use App\Livewire\Stock\UnassignedItems;
 use App\Livewire\Stock\ProductSummary;
@@ -31,6 +32,7 @@ Route::middleware(['auth', 'permission:stock.manage'])->prefix('stock')->group(f
     Route::get('/summary', ProductSummary::class)->name('stock.summary');
     Route::get('/unassigned', UnassignedItems::class)->name('stock.unassigned');
     Route::get('/categories', CategoryTree::class)->middleware('permission:category.manage')->name('stock.categories');
+    Route::get('/categories/{category}', CategoryDetail::class)->middleware('permission:category.manage')->name('stock.categories.show');
     Route::get('/boxes', ContainerList::class)->name('stock.boxes');
     Route::get('/boxes/{box}', BoxDetail::class)->name('stock.boxes.show');
 

@@ -23,7 +23,7 @@
                     <x-ui.field label="Metal" for="rs-ometal"><select id="rs-ometal" wire:model.live="outsideMetal" class="rj-select">@foreach (array_keys(\App\Models\Movement\RateLog::rateCarats()) as $m)<option value="{{ $m }}">{{ ucfirst($m) }}</option>@endforeach</select></x-ui.field>
                     <x-ui.field label="Carat" for="rs-ocarat" error="outsideCarat"><select id="rs-ocarat" wire:model="outsideCarat" class="rj-select"><option value="">Choose...</option>@foreach (\App\Models\Movement\RateLog::CARATS[$outsideMetal] ?? [] as $c)<option value="{{ $c }}">{{ $c }}</option>@endforeach</select></x-ui.field>
                     <x-ui.field label="Kind" for="rs-okind"><select id="rs-okind" wire:model="outsideKind" class="rj-select"><option value="old_gold">Old metal</option><option value="scrap">Scrap</option></select></x-ui.field>
-                    <x-ui.field label="Weight sent (g)" for="rs-oweight" error="weight"><input id="rs-oweight" type="number" step="0.001" min="0" wire:model="weight" class="rj-input tabular"></x-ui.field>
+                    <x-ui.field label="Weight sent (g)" for="rs-oweight" error="weight"><input id="rs-oweight" type="text" inputmode="decimal" autocomplete="off" wire:model="weight" class="rj-input tabular"></x-ui.field>
                 </div>
                 <x-ui.field label="Whose metal, or where from" for="rs-onote" error="outsideNote" class="mt-4"><input id="rs-onote" type="text" maxlength="255" wire:model="outsideNote" class="rj-input" placeholder="e.g. brought in by a customer, from another shop"></x-ui.field>
             @elseif (empty($sendable))
@@ -44,7 +44,7 @@
                     <div class="flex gap-2">
                         <div class="rj-input-icon flex-1">
                             <x-ui.icon name="scale" :size="16" />
-                            <input id="rs-weight" type="number" step="0.001" min="0" wire:model="weight" class="rj-input tabular">
+                            <input id="rs-weight" type="text" inputmode="decimal" autocomplete="off" wire:model="weight" class="rj-input tabular">
                         </div>
                         @if ($source)<x-ui.button type="button" variant="secondary" wire:click="sendAll">All of it</x-ui.button>@endif
                     </div>

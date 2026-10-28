@@ -110,17 +110,6 @@
                         <x-ui.button variant="secondary" size="sm" iconRight="arrow-right" :href="route('movements.pending-review')">Review queue</x-ui.button>
                     @endif
                 </div>
-            @elseif ($sale)
-                <div class="flex flex-wrap items-center gap-4 p-5 rounded-card border bg-gold-tint border-gold-soft">
-                    <div class="w-10 h-10 shrink-0 rounded-xl bg-white text-gold-dark flex items-center justify-center"><x-ui.icon name="receipt" :size="18" /></div>
-                    <div class="flex-1 min-w-[220px]">
-                        <div class="text-[14px] font-bold text-ink_text-primary">
-                            {{ $sale->confirmed_by_accountant ? 'Sold' : 'In a sale awaiting verification' }}{{ $sale->customer ? ' to ' . $sale->customer->name : '' }}
-                        </div>
-                        <div class="text-[12.5px] text-ink_text-secondary mt-0.5">Invoice {{ $sale->invoice_number }} · {{ $sale->created_at->format('d M Y') }} · ₹{{ number_format($sale->pivot->price_at_sale, 2) }}</div>
-                    </div>
-                    <x-ui.button variant="secondary" size="sm" iconRight="arrow-right" :href="route('sales.invoice', $sale)">Invoice</x-ui.button>
-                </div>
             @endif
 
             <x-ui.card title="History" subtitle="Every place it has been, from the day it was entered until now" icon="history">

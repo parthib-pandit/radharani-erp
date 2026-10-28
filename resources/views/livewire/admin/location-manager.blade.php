@@ -54,7 +54,7 @@
                 </x-ui.field>
             @endif
             <x-ui.field label="Order in lists" for="loc-order" error="sort_order">
-                <input id="loc-order" type="number" min="0" wire:model="sort_order" class="rj-input tabular">
+                <input id="loc-order" type="text" inputmode="numeric" autocomplete="off" wire:model="sort_order" class="rj-input tabular">
             </x-ui.field>
         </div>
         <x-slot:footer>

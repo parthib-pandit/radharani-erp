@@ -2,6 +2,7 @@
 namespace App\Services;
 
 use App\Models\Movement\Movement;
+use App\Models\Sales\Sale;
 use App\Models\Stock\Box;
 use App\Models\Stock\Item;
 use App\Models\Stock\Packet;
@@ -88,7 +89,7 @@ class StockHistoryService
             }
         }
 
-        foreach ($item->sales()->with('cancellation.user')->get() as $sale) {
+        foreach ($item->sales()->with('cancellation.user', 'customer:id,name')->get() as $sale) {
             if ($sale->cancellation) {
                 $events->push([
                     'at' => $sale->cancellation->created_at, 'kind' => 'sale', 'icon' => 'x-circle', 'tone' => 'danger',
@@ -104,6 +105,7 @@ class StockHistoryService
                 'tone' => 'gold',
                 'title' => $sale->confirmed_by_accountant ? 'Sold (verified)' : 'Sale entered, awaiting verification',
                 'meta' => array_filter([
+                    $sale->customer ? 'To ' . $sale->customer->name : null,
                     'Invoice ' . $sale->invoice_number,
                     '₹' . number_format((float) $sale->pivot->price_at_sale, 2),
                 ]),
@@ -192,7 +194,7 @@ class StockHistoryService
                 $item ? route('stock.items.show', $item) : null));
         }
 
-        return $this->sort($events);
+        return $this->sort($events->concat($this->saleEvents($packet->items()->pluck('id'))));
     }
 
     public function forBox(Box $box): Collection
@@ -227,7 +229,50 @@ class StockHistoryService
                 [], $p ? route('stock.packets.show', $p) : null));
         }
 
-        return $this->sort($events);
+        return $this->sort($events->concat($this->saleEvents(Item::whereIn('packet_id', $box->packets()->select('id'))->pluck('id'))));
+    }
+
+    /**
+     * The sales (and cancellations) of the pieces in a packet or box, as events for its History. A sold piece stays linked
+     * to its packet, so its sale belongs in that packet's own timeline, not in a block of its own.
+     */
+    private function saleEvents(Collection $itemIds): Collection
+    {
+        if ($itemIds->isEmpty()) {
+            return collect();
+        }
+        $ids = $itemIds->flip();
+        $events = collect();
+        foreach (Sale::with('items', 'creator:id,name', 'customer:id,name', 'cancellation.user')->whereHas('items', fn ($q) => $q->whereIn('items.id', $itemIds))->get() as $sale) {
+            foreach ($sale->items->filter(fn ($i) => $ids->has($i->id)) as $piece) {
+                $events->push([
+                    'at' => $sale->created_at,
+                    'kind' => 'sale',
+                    'icon' => 'receipt',
+                    'tone' => 'gold',
+                    'title' => ($sale->confirmed_by_accountant ? 'Sold (verified): ' : 'Sale entered, awaiting verification: ') . $piece->label,
+                    'meta' => array_filter([
+                        $sale->customer ? 'To ' . $sale->customer->name : null,
+                        'Invoice ' . $sale->invoice_number,
+                        '₹' . number_format((float) $piece->pivot->price_at_sale, 2),
+                    ]),
+                    'note' => null,
+                    'user' => $sale->creator?->name,
+                    'photo' => null,
+                    'link' => \Route::has('sales.invoice') ? route('sales.invoice', $sale) : null,
+                ]);
+                if ($sale->cancellation) {
+                    $events->push([
+                        'at' => $sale->cancellation->created_at, 'kind' => 'sale', 'icon' => 'x-circle', 'tone' => 'danger',
+                        'title' => 'Sale cancelled, back in stock: ' . $piece->label, 'meta' => array_filter(['Sale #' . $sale->id]),
+                        'note' => $sale->cancellation->reason, 'user' => $sale->cancellation->user?->name, 'photo' => null,
+                        'link' => \Route::has('sales.invoice') ? route('sales.invoice', $sale) : null,
+                    ]);
+                }
+            }
+        }
+
+        return $events;
     }
 
     // Log a QR scan against whatever the code points to (called from the /q/{code} resolver).

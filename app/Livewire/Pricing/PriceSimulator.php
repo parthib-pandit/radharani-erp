@@ -23,6 +23,28 @@ class PriceSimulator extends Component
     public $stone_value = '';
     public bool $has_huid = true;   // the hallmarking charge applies to pieces that carry a HUID only
 
+    // The making charge bargained down (the slider), as a rate. Empty means the rate the pricing gives. Shown inside the dashboard too.
+    public $bargain = '';
+    public bool $embedded = false;
+
+    public function mount(bool $embedded = false): void
+    {
+        $this->embedded = $embedded;
+    }
+
+    // A different piece or making setting means a different pricing rate, so the bargain starts again.
+    public function updated(string $name): void
+    {
+        if (in_array($name, ['metal', 'purity', 'categoryId', 'making_type', 'making_value'], true)) {
+            $this->bargain = '';
+        }
+    }
+
+    public function setBargain($rate): void
+    {
+        $this->bargain = is_numeric($rate) ? (string) $rate : '';
+    }
+
     public function updatedMetal(): void
     {
         $this->purity = (ItemForm::PURITIES[$this->metal] ?? [''])[0];
@@ -44,7 +66,7 @@ class PriceSimulator extends Component
                 'making_value' => is_numeric($this->making_value) ? (float) $this->making_value : 0,
                 'stone_value' => is_numeric($this->stone_value) ? (float) $this->stone_value : 0,
             ]);
-            $result = $pricing->breakdown($draft);
+            $result = $pricing->breakdown($draft, ['making_rate' => is_numeric($this->bargain) ? (float) $this->bargain : null]);
         }
 
         $gst = null;
@@ -56,6 +78,7 @@ class PriceSimulator extends Component
         return view('livewire.pricing.price-simulator', [
             'result' => $result,
             'gst' => $gst,
+            'canSell' => (bool) auth()->user()?->can('sale.create'),
             'metals' => ItemForm::METALS,
             'purities' => ItemForm::PURITIES[$this->metal] ?? [],
             'categories' => ItemCategory::active()->forMetal($this->metal)->orderBy('sort_order')->orderBy('name')->get(['id', 'name']),

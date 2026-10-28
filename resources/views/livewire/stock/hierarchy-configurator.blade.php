@@ -16,7 +16,7 @@
         </x-slot:actions>
     </x-ui.page-header>
 
-    @php $col = 'bg-white border border-line-light rounded-card shadow-card flex flex-col min-h-[420px] lg:h-[calc(100dvh-250px)] overflow-hidden'; @endphp
+    @php $col = 'bg-white border border-line-light rounded-card shadow-card flex flex-col min-h-[320px] max-h-[78dvh] lg:max-h-none lg:min-h-[420px] lg:h-[calc(100dvh-250px)] overflow-hidden'; @endphp
 
     <div class="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)_minmax(0,1.25fr)] gap-4">
 
@@ -25,7 +25,7 @@
             <header class="px-4 pt-4 pb-3 border-b border-line-light">
                 <div class="flex items-center justify-between mb-3">
                     <h2 class="flex items-center gap-2 text-[14px] font-bold"><x-ui.icon name="archive" :size="16" class="text-gold-dark" /> Boxes</h2>
-                    <span class="text-[12px] text-ink_text-muted tabular">{{ $boxes->count() }}</span>
+                    <span class="text-[12px] text-ink_text-muted tabular">{{ $totals['box'] }}</span>
                 </div>
                 <x-ui.search-input scan wire:model.live.debounce.250ms="boxSearch" placeholder="Find a box" class="[&_.rj-input]:h-9" />
             </header>
@@ -67,6 +67,7 @@
                     </button>
                 </div>
             </div>
+            @include('livewire.stock.partials.configurator-more', ['column' => 'box', 'shown' => $boxes->count(), 'total' => $totals['box']])
         </section>
 
         {{-- ============================================================ PACKETS --}}
@@ -146,6 +147,7 @@
                     </button>
                 </div>
             </div>
+            @include('livewire.stock.partials.configurator-more', ['column' => 'packet', 'shown' => $packets->count(), 'total' => $totals['packet']])
         </section>
 
         {{-- ============================================================ PIECES --}}
@@ -186,7 +188,7 @@
                         <label class="sticky top-0 z-[1] flex items-center gap-2.5 px-4 py-2 bg-surface-sunken/95 backdrop-blur border-b border-line-light text-[12px] font-semibold text-ink_text-secondary cursor-pointer">
                             <input type="checkbox" class="rj-checkbox" @checked(count($itemIds) && ! array_diff($itemIds, $selectedItems))
                                 x-on:change="$wire.set('selectedItems', $event.target.checked ? @js($itemIds) : [])">
-                            Select all {{ $items->count() }}{{ $items->count() === 200 ? '+' : '' }}
+                            Select all {{ $items->count() }} shown
                         </label>
                     @endif
                     <ul class="divide-y divide-line-light">
@@ -210,6 +212,7 @@
                     </ul>
                 @endif
             </div>
+            @include('livewire.stock.partials.configurator-more', ['column' => 'item', 'shown' => $items->count(), 'total' => $totals['item']])
         </section>
     </div>
 

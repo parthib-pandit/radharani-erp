@@ -6,14 +6,15 @@ use App\Models\Stock\Item;
 use App\Models\Stock\Packet;
 use App\Support\SpreadsheetReader;
 use App\Support\StockLookup;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 
 /**
- * The working screen for keeping the system matching the stock room:
- *  - scan:  scan a packet/box once, then scan pieces (or packets) into it, one after another
- *  - pick:  choose a destination, tick pieces/packets from a filtered list
+ * The working screen for keeping the system matching the stock room (28 Oct: the move works exactly as it does on a piece's own page):
+ *  - move:  scan pieces (or packets) into a list, choose where they go the way the piece page does (scan the packet or box, or pick the
+ *           packet from the list grouped by box), then move them all at once. A piece already on the list is not scanned again.
  *  - sheet: upload a two-column spreadsheet (code, destination) and apply the valid rows
  * Every reassignment is a per-model save, so it lands in the activity history.
  */
@@ -21,23 +22,20 @@ class AssignToContainer extends Component
 {
     use WithFileUploads;
 
-    #[Url(except: 'scan')]
-    public string $mode = 'scan'; // scan | pick | sheet
+    #[Url(except: 'move')]
+    public string $mode = 'move'; // move | sheet
 
-    // ---- scan
-    public string $destCode = '';
-    public ?string $destType = null; // packet | box
-    public ?int $destId = null;
-    public ?string $destError = null;
-    public array $log = [];
-
-    // ---- pick
-    public string $pickKind = 'items'; // items (into a packet) | packets (into a box)
-    public ?int $pickDestId = null;
-    public string $pickSearch = '';
-    public bool $pickUnassigned = true;
-    public string $pickCategory = '';
-    public array $pickSelected = [];
+    // ---- move
+    public string $kind = 'items'; // items (into a packet) | packets (into a box)
+    /** @var list<array{type: string, id: int, code: string, detail: string, from: ?string}> */
+    public array $tray = [];
+    public string $moveTo = '';    // '' = not chosen yet, 'none' = no packet / no box, else the packet or box id
+    public ?string $moveBox = null; // narrows the packet list to one box, as on the piece page
+    public ?string $moveScanError = null;
+    /** @var array{tone: string, code: string, message: string}|null */
+    public ?array $feedback = null;
+    /** @var array{kind: string, count: int, dest: string, undo: list<array{id: int, prev: ?int}>, undone: bool}|null */
+    public ?array $lastMove = null;
 
     // ---- sheet
     public $sheet = null;
@@ -45,199 +43,206 @@ class AssignToContainer extends Component
     public ?string $sheetName = null;
     public ?int $sheetApplied = null;
 
+    public function mount(): void
+    {
+        // The old addresses (?mode=scan, ?mode=pick) open the move screen.
+        $this->mode = $this->mode === 'sheet' ? 'sheet' : 'move';
+    }
+
     public function setMode(string $mode): void
     {
-        if (in_array($mode, ['scan', 'pick', 'sheet'], true)) {
-            $this->mode = $mode;
-            $this->resetValidation();
+        $this->mode = $mode === 'sheet' ? 'sheet' : 'move';
+        $this->resetValidation();
+    }
+
+    // ================================================================ move
+
+    public function setKind(string $kind): void
+    {
+        $kind = $kind === 'packets' ? 'packets' : 'items';
+        if ($kind !== $this->kind) {
+            $this->kind = $kind;
+            $this->reset(['tray', 'moveTo', 'moveBox', 'moveScanError', 'feedback']);
         }
     }
 
-    // ================================================================ scan
-
-    public function setDestination(): void
-    {
-        $this->destError = null;
-        $found = StockLookup::container($this->destCode);
-
-        if (! $found) {
-            $this->destError = 'No packet or box has the code "' . StockLookup::normalize($this->destCode) . '".';
-            return;
-        }
-
-        $this->destType = $found['type'];
-        $this->destId = $found['model']->id;
-        $this->destCode = '';
-        $this->dispatch('scan-ready');
-    }
-
-    public function clearDestination(): void
-    {
-        $this->reset(['destType', 'destId', 'destError', 'destCode']);
-        $this->dispatch('dest-cleared');
-    }
-
-    // The code arrives as an argument (the field is cleared in the browser on Enter),
-    // so fast consecutive scans queue up instead of overwriting each other.
+    // The code arrives as an argument (the field is cleared in the browser on Enter), so fast scans queue up instead of overwriting each other.
     public function scan(string $raw): void
     {
         // Several at once: codes pasted or scanned together. Codes can hold spaces, so the whole input is tried first.
-        $codes = StockLookup::splitCodes($raw, fn ($c) => $this->destType === 'packet' ? StockLookup::item($c) : StockLookup::packet($c));
-        if (count($codes) > 1) {
-            foreach ($codes as $one) {
-                $this->scanOne($one);
-            }
-            $this->dispatch('scan-ready');
-
-            return;
+        $codes = StockLookup::splitCodes($raw, fn ($c) => $this->kind === 'items' ? StockLookup::item($c) : StockLookup::packet($c));
+        foreach ($codes as $one) {
+            $this->scanOne($one);
         }
-
-        $this->scanOne($raw);
-        $this->dispatch('scan-ready');
-    }
-
-    // Pick the destination from a list instead of scanning it.
-    public function chooseDestination(string $value): void
-    {
-        [$type, $id] = array_pad(explode(':', $value, 2), 2, null);
-        $model = match ($type) {
-            'packet' => Packet::find($id),
-            'box' => Box::find($id),
-            default => null,
-        };
-        if (! $model) {
-            return;
-        }
-        $this->destType = $type;
-        $this->destId = $model->id;
-        $this->destError = null;
         $this->dispatch('scan-ready');
     }
 
     private function scanOne(string $raw): void
     {
         $code = StockLookup::normalize($raw);
-
-        if ($code === '' || ! $this->destId) {
+        if ($code === '') {
             return;
         }
 
-        $this->destType === 'packet' ? $this->scanPieceIntoPacket($code) : $this->scanPacketIntoBox($code);
+        if ($this->kind === 'items') {
+            $model = StockLookup::item($code);
+            if (! $model) {
+                $this->say('error', $code, 'No piece found with this code.');
+
+                return;
+            }
+            if ($model->status === 'sold') {
+                $this->say('error', $model->label, 'This piece is sold. Sold pieces are not regrouped.');
+
+                return;
+            }
+            $label = $model->label;
+            $from = $model->packet?->code;
+            $currentId = $model->packet_id;
+            $detail = trim($model->category . ' · ' . number_format($model->weight, 3) . ' g');
+            $type = 'item';
+        } else {
+            $model = StockLookup::packet($code);
+            if (! $model) {
+                $this->say('error', $code, 'No packet found with this code. A box can only hold packets.');
+
+                return;
+            }
+            $label = $model->code;
+            $from = $model->box?->code;
+            $currentId = $model->box_id;
+            $detail = $model->custodyItems()->count() . ' pieces';
+            $type = 'packet';
+        }
+
+        // Already on the list: nothing is added a second time.
+        if (collect($this->tray)->contains(fn ($t) => $t['type'] === $type && $t['id'] === $model->id)) {
+            $this->say('info', $label, 'This item is already scanned.');
+
+            return;
+        }
+        if (ctype_digit($this->moveTo) && (int) $this->moveTo === (int) $currentId) {
+            $this->say('info', $label, 'Already there.');
+
+            return;
+        }
+
+        array_unshift($this->tray, ['type' => $type, 'id' => $model->id, 'code' => $label, 'detail' => $detail, 'from' => $from]);
+        $this->say('success', $label, 'Added to the list.');
     }
 
-    private function scanPieceIntoPacket(string $code): void
+    public function removeFromList(int $index): void
     {
-        $packet = Packet::findOrFail($this->destId);
-        $item = StockLookup::item($code);
-
-        if (! $item) {
-            $this->logEntry('error', $code, 'No piece found with this code.');
-            return;
-        }
-        if ($item->status === 'sold') {
-            $this->logEntry('error', $item->label, 'This piece is sold. Sold pieces are not regrouped.');
-            return;
-        }
-        if ($item->packet_id === $packet->id) {
-            $this->logEntry('info', $item->label, "Already in {$packet->code}.");
-            return;
-        }
-
-        $from = $item->packet?->code;
-        $prev = $item->packet_id;
-        $item->update(['packet_id' => $packet->id]);
-        $this->logEntry('success', $item->label, $from ? "Moved from {$from}" : 'Placed in packet', ['type' => 'item', 'id' => $item->id, 'prev' => $prev],
-            trim($item->category . ' · ' . number_format($item->weight, 3) . ' g'));
-    }
-
-    private function scanPacketIntoBox(string $code): void
-    {
-        $box = Box::findOrFail($this->destId);
-        $packet = StockLookup::packet($code);
-
-        if (! $packet) {
-            $this->logEntry('error', $code, 'No packet found with this code.');
-            return;
-        }
-        if ($packet->box_id === $box->id) {
-            $this->logEntry('info', $packet->code, "Already in {$box->code}.");
-            return;
-        }
-
-        $from = $packet->box?->code;
-        $prev = $packet->box_id;
-        $packet->update(['box_id' => $box->id]);
-        $this->logEntry('success', $packet->code, $from ? "Moved from {$from}" : 'Placed in box', ['type' => 'packet', 'id' => $packet->id, 'prev' => $prev],
-            $packet->custodyItems()->count() . ' pieces');
-    }
-
-    public function undo(int $index): void
-    {
-        $entry = $this->log[$index] ?? null;
-        if (! $entry || empty($entry['undo']) || ! empty($entry['undone'])) {
-            return;
-        }
-
-        ['type' => $type, 'id' => $id, 'prev' => $prev] = $entry['undo'];
-        $type === 'item'
-            ? Item::find($id)?->update(['packet_id' => $prev])
-            : Packet::find($id)?->update(['box_id' => $prev]);
-
-        $this->log[$index]['undone'] = true;
-        $this->dispatch('toast', message: "Undid {$entry['code']}.", type: 'info');
+        unset($this->tray[$index]);
+        $this->tray = array_values($this->tray);
         $this->dispatch('scan-ready');
     }
 
-    public function clearLog(): void
+    public function clearList(): void
     {
-        $this->log = [];
+        $this->reset(['tray', 'feedback']);
+        $this->dispatch('scan-ready');
     }
 
-    private function logEntry(string $tone, string $code, string $message, ?array $undo = null, ?string $detail = null): void
+    // Scan (or type) the destination, as on the piece page: a packet is chosen, a box narrows the packet list (pieces) or is chosen (packets).
+    public function scanDestination(string $raw): void
     {
-        array_unshift($this->log, [
-            'tone' => $tone, 'code' => $code, 'message' => $message, 'detail' => $detail,
-            'undo' => $undo, 'undone' => false, 'at' => now()->format('g:i:s a'),
-        ]);
-        $this->log = array_slice($this->log, 0, 60);
-    }
+        $this->moveScanError = null;
+        $found = StockLookup::container($raw);
+        if (! $found) {
+            $this->moveScanError = 'No packet or box has that code.';
 
-    // ================================================================ pick
-
-    public function updatedPickKind(): void
-    {
-        $this->reset(['pickDestId', 'pickSelected', 'pickSearch', 'pickCategory']);
-        $this->pickUnassigned = true;
-    }
-
-    public function updatedPickDestId(): void
-    {
-        $this->pickSelected = [];
-    }
-
-    public function assignPicked(): void
-    {
-        $destRule = $this->pickKind === 'items' ? 'exists:packets,id' : 'exists:boxes,id';
-        $this->validate([
-            'pickDestId' => ['required', $destRule],
-            'pickSelected' => ['required', 'array', 'min:1'],
-        ], [
-            'pickDestId.required' => $this->pickKind === 'items' ? 'Choose the packet they are going into.' : 'Choose the box they are going into.',
-            'pickSelected.required' => 'Tick at least one row.',
-        ]);
-
-        if ($this->pickKind === 'items') {
-            $dest = Packet::findOrFail($this->pickDestId);
-            $rows = Item::whereIn('id', $this->pickSelected)->where('status', '!=', 'sold')->get();
-            $rows->each(fn ($i) => $i->update(['packet_id' => $dest->id]));
-        } else {
-            $dest = Box::findOrFail($this->pickDestId);
-            $rows = Packet::whereIn('id', $this->pickSelected)->get();
-            $rows->each(fn ($p) => $p->update(['box_id' => $dest->id]));
+            return;
         }
 
-        $this->pickSelected = [];
-        $this->dispatch('toast', message: "{$rows->count()} " . ($this->pickKind === 'items' ? 'piece(s)' : 'packet(s)') . " assigned to {$dest->code}.", type: 'success');
+        if ($this->kind === 'packets') {
+            if ($found['type'] !== 'box') {
+                $this->moveScanError = 'Packets go into a box. Scan a box.';
+
+                return;
+            }
+            $this->moveTo = (string) $found['model']->id;
+
+            return;
+        }
+
+        if ($found['type'] === 'packet') {
+            $this->moveTo = (string) $found['model']->id;
+            $this->moveBox = $found['model']->box?->code;
+
+            return;
+        }
+        $this->moveBox = $found['model']->code;
+        $inside = $found['model']->packets()->pluck('id');
+        $this->moveTo = $inside->count() === 1 ? (string) $inside->first() : '';
+    }
+
+    public function move(): void
+    {
+        if (! $this->tray) {
+            $this->say('error', '', $this->kind === 'items' ? 'Scan at least one piece first.' : 'Scan at least one packet first.');
+
+            return;
+        }
+        $this->resetValidation();
+        $isId = ctype_digit($this->moveTo) && ($this->kind === 'items' ? Packet::whereKey($this->moveTo)->exists() : Box::whereKey($this->moveTo)->exists());
+        if ($this->moveTo !== 'none' && ! $isId) {
+            $this->addError('moveTo', $this->kind === 'items' ? 'Choose the packet they are going into.' : 'Choose the box they are going into.');
+
+            return;
+        }
+
+        $destId = $this->moveTo === 'none' ? null : (int) $this->moveTo;
+        $dest = $destId ? ($this->kind === 'items' ? Packet::find($destId) : Box::find($destId)) : null;
+        $moved = [];
+        $skipped = 0;
+
+        DB::transaction(function () use ($destId, &$moved, &$skipped) {
+            foreach ($this->tray as $t) {
+                if ($t['type'] === 'item') {
+                    $item = Item::find($t['id']);
+                    if (! $item || $item->status === 'sold' || $item->packet_id === $destId) {
+                        $skipped++;
+                        continue;
+                    }
+                    $moved[] = ['id' => $item->id, 'prev' => $item->packet_id];
+                    $item->update(['packet_id' => $destId]); // per piece, so each piece's history shows it
+                } else {
+                    $packet = Packet::find($t['id']);
+                    if (! $packet || $packet->box_id === $destId) {
+                        $skipped++;
+                        continue;
+                    }
+                    $moved[] = ['id' => $packet->id, 'prev' => $packet->box_id];
+                    $packet->update(['box_id' => $destId]);
+                }
+            }
+        });
+
+        $where = $dest ? $dest->code : ($this->kind === 'items' ? 'no packet' : 'no box');
+        $this->lastMove = ['kind' => $this->kind, 'count' => count($moved), 'dest' => $where, 'undo' => $moved, 'undone' => false];
+        $this->reset(['tray', 'feedback']);
+        $this->dispatch('toast', message: count($moved) . ' ' . ($this->kind === 'items' ? \Illuminate\Support\Str::plural('piece', count($moved)) : \Illuminate\Support\Str::plural('packet', count($moved))) . " moved to {$where}." . ($skipped ? " {$skipped} already there or no longer available." : ''), type: $moved ? 'success' : 'warning');
+        $this->dispatch('scan-ready');
+    }
+
+    public function undoLast(): void
+    {
+        if (! $this->lastMove || $this->lastMove['undone']) {
+            return;
+        }
+        foreach ($this->lastMove['undo'] as $u) {
+            $this->lastMove['kind'] === 'items'
+                ? Item::find($u['id'])?->update(['packet_id' => $u['prev']])
+                : Packet::find($u['id'])?->update(['box_id' => $u['prev']]);
+        }
+        $this->lastMove['undone'] = true;
+        $this->dispatch('toast', message: 'Put back where they were.', type: 'info');
+    }
+
+    private function say(string $tone, string $code, string $message): void
+    {
+        $this->feedback = ['tone' => $tone, 'code' => $code, 'message' => $message];
     }
 
     // =============================================================== sheet
@@ -346,54 +351,22 @@ class AssignToContainer extends Component
 
     public function render()
     {
-        $dest = match ($this->destType) {
-            'packet' => Packet::withCount('custodyItems as items_count')->with('box')->find($this->destId),
-            'box' => Box::withCount('packets')->find($this->destId),
-            default => null,
-        };
-
-        $pickRows = collect();
-        if ($this->mode === 'pick') {
-            $pickRows = $this->pickKind === 'items'
-                ? Item::with('packet:id,code')
-                    ->where('status', '!=', 'sold')
-                    ->when($this->pickUnassigned, fn ($q) => $q->whereNull('packet_id'))
-                    ->when($this->pickDestId, fn ($q) => $q->where(fn ($q) => $q->whereNull('packet_id')->orWhere('packet_id', '!=', $this->pickDestId)))
-                    ->when($this->pickCategory, fn ($q) => $q->where('category', $this->pickCategory))
-                    ->when($this->pickSearch, fn ($q) => $q->where(fn ($q) => $q
-                        ->where('huid_code', 'like', "%{$this->pickSearch}%")
-                        ->orWhere('internal_code', 'like', "%{$this->pickSearch}%")
-                        ->orWhere('category', 'like', "%{$this->pickSearch}%")
-                        ->orWhere('description', 'like', "%{$this->pickSearch}%")))
-                    ->orderByDesc('id')->limit(100)->get()
-                : Packet::with('box:id,code')->withCount('custodyItems as items_count')
-                    ->when($this->pickUnassigned, fn ($q) => $q->whereNull('box_id'))
-                    ->when($this->pickDestId, fn ($q) => $q->where(fn ($q) => $q->whereNull('box_id')->orWhere('box_id', '!=', $this->pickDestId)))
-                    ->when($this->pickSearch, fn ($q) => $q->where(fn ($q) => $q
-                        ->where('code', 'like', "%{$this->pickSearch}%")->orWhere('label', 'like', "%{$this->pickSearch}%")))
-                    ->orderBy('code')->limit(100)->get();
-        }
-
-        $sheet = collect($this->sheetRows);
+        $inTray = collect($this->tray);
 
         return view('livewire.stock.assign-to-container', [
-            'dest' => $dest,
-            'recent' => $dest && $this->destType === 'packet'
-                ? $dest->items()->latest('updated_at')->limit(6)->get()
-                : ($dest ? $dest->packets()->latest('updated_at')->limit(6)->get() : collect()),
-            'pickRows' => $pickRows,
-            'packets' => Packet::with('box:id,code')->orderBy('code')->get(['id', 'code', 'label', 'box_id'])->groupBy(fn ($p) => $p->box?->code ?? 'Not in a box'),
-            'boxes' => Box::orderBy('code')->get(['id', 'code', 'label']),
-            'categories' => Item::query()->distinct()->orderBy('category')->pluck('category'),
+            'trayWeight' => $this->kind === 'items' ? Item::whereIn('id', $inTray->where('type', 'item')->pluck('id'))->sum('weight') : 0,
+            // The same lists as the piece page: packets grouped by their box, narrowed to one box when a box was scanned.
+            'packetsByBox' => $this->kind === 'items'
+                ? Packet::with('box:id,code')->orderBy('code')->get(['id', 'code', 'label', 'box_id'])
+                    ->when($this->moveBox, fn ($c) => $c->filter(fn ($p) => $p->box?->code === $this->moveBox))
+                    ->groupBy(fn ($p) => $p->box?->code ?? 'Not in a box')
+                : collect(),
+            'boxes' => $this->kind === 'packets' ? Box::orderBy('code')->get(['id', 'code', 'label']) : collect(),
             'sheetCounts' => [
-                'ok' => $sheet->where('status', 'ok')->count(),
-                'same' => $sheet->where('status', 'same')->count(),
-                'error' => $sheet->where('status', 'error')->count(),
-                'done' => $sheet->where('status', 'done')->count(),
-            ],
-            'logCounts' => [
-                'success' => collect($this->log)->where('tone', 'success')->where('undone', false)->count(),
-                'error' => collect($this->log)->where('tone', 'error')->count(),
+                'ok' => collect($this->sheetRows)->where('status', 'ok')->count(),
+                'same' => collect($this->sheetRows)->where('status', 'same')->count(),
+                'error' => collect($this->sheetRows)->where('status', 'error')->count(),
+                'done' => collect($this->sheetRows)->where('status', 'done')->count(),
             ],
         ])->layout('components.layouts.app', ['title' => 'Change Item location · Radharani Jewellery']);
     }

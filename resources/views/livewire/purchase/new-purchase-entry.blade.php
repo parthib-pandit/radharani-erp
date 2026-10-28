@@ -10,7 +10,7 @@
                         <div class="grid grid-cols-2 sm:grid-cols-[130px_120px_130px_1fr_auto] gap-2 items-start" wire:key="pl-{{ $i }}">
                             <select wire:model.live="lines.{{ $i }}.metal" class="rj-select" aria-label="Metal">@foreach ($metals as $k => $v)<option value="{{ $k }}">{{ $v }}</option>@endforeach</select>
                             <select wire:model="lines.{{ $i }}.purity" class="rj-select" aria-label="Carat">@foreach ($purities[$l['metal']] ?? [] as $p)<option value="{{ $p }}">{{ $p }}</option>@endforeach</select>
-                            <input type="number" step="0.001" min="0" wire:model="lines.{{ $i }}.weight" placeholder="Weight (g)" class="rj-input tabular @error('lines.' . $i . '.weight') is-invalid @enderror" aria-label="Weight">
+                            <input type="text" inputmode="decimal" autocomplete="off" wire:model="lines.{{ $i }}.weight" placeholder="Weight (g)" class="rj-input tabular @error('lines.' . $i . '.weight') is-invalid @enderror" aria-label="Weight">
                             <input type="text" wire:model="lines.{{ $i }}.description" placeholder="Note (optional)" maxlength="100" class="rj-input col-span-2 sm:col-span-1" aria-label="Line note">
                             <x-ui.button type="button" variant="ghost" size="icon-sm" icon="x" wire:click="removeLine({{ $i }})" aria-label="Remove line" />
                         </div>

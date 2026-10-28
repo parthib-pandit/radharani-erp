@@ -75,20 +75,20 @@ class SaleFromOrderTest extends TestCase
         Movement::create(['trackable_type' => 'item', 'trackable_id' => $piece->id, 'movement_type' => 'vault_out', 'user_id' => $this->user->id]);
 
         $c = Livewire::test(NewSale::class)
-            ->set('customerId', $this->customer->id)->call('next')
+            ->set('customerId', $this->customer->id)
             ->call('addItem', $piece->id)->call('next')
-            ->set('extras', [['name' => 'Making', 'amount' => '5000']])->call('next');
+            ->set('extras', [['name' => 'Making', 'amount' => '5000']])->call('next')->call('next');
 
         $this->assertSame(4, $c->get('step'));
         $this->assertEquals($c->get('total'), $c->get('payments')[0]['amount']); // the whole bill, GST included
 
-        // Back to the charges: the untouched line follows the new total.
-        $c->call('goToStep', 3)->set('extras', [['name' => 'Making', 'amount' => '7000']])->call('next');
+        // Back to the bill: the untouched line follows the new total.
+        $c->call('goToStep', 2)->set('extras', [['name' => 'Making', 'amount' => '7000']])->call('next')->call('next');
         $this->assertEquals($c->get('total'), $c->get('payments')[0]['amount']);
         $this->assertGreaterThan(7000 + $c->get('subtotal'), $c->get('total'), 'GST is on top of the pieces and the extra charge');
 
         // An amount staff typed is never overwritten.
-        $c->set('payments.0.amount', '2000')->call('goToStep', 3)->call('next');
+        $c->set('payments.0.amount', '2000')->call('goToStep', 2)->call('next')->call('next');
         $this->assertSame('2000', (string) $c->get('payments')[0]['amount']);
     }
 

@@ -33,7 +33,7 @@ class InvoiceView extends Component
         abort_unless(Auth::user()?->can('sale.create'), 403);
         abort_if(Sale::findOrFail($this->sale->id)->isCancelled(), 422, 'This sale is cancelled.');
         $this->validate([
-            'mode' => ['required', 'in:cash,upi,card,bank'],
+            'mode' => ['required', 'in:' . implode(',', array_keys(SalePayment::NEW_MODES))],
             'amount' => ['required', 'numeric', 'min:0.01'],
             'note' => ['nullable', 'string', 'max:255'],
         ]);
@@ -45,7 +45,8 @@ class InvoiceView extends Component
             return;
         }
 
-        SalePayment::create(['sale_id' => $sale->id, 'mode' => $this->mode, 'amount' => round((float) $this->amount, 2), 'note' => $this->note ?: null, 'user_id' => Auth::id()]);
+        $payment = SalePayment::create(['sale_id' => $sale->id, 'mode' => $this->mode, 'amount' => round((float) $this->amount, 2), 'note' => $this->note ?: null, 'user_id' => Auth::id()]);
+        \App\Support\MoneyMessages::paymentReceived($sale, $payment);
         $this->reset(['amount', 'note']);
         $this->dispatch('toast', message: 'Payment recorded.', type: 'success');
     }

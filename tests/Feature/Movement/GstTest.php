@@ -60,7 +60,7 @@ class GstTest extends TestCase
 
     private function toItems(Item $piece)
     {
-        return Livewire::test(NewSale::class)->set('customerId', $this->customer->id)->call('next')->call('addItem', $piece->id);
+        return Livewire::test(NewSale::class)->set('customerId', $this->customer->id)->call('addItem', $piece->id);
     }
 
     // ---------------------------------------------------------------- the sums
@@ -134,7 +134,7 @@ class GstTest extends TestCase
     public function test_the_sale_keeps_the_rates_and_the_gst_it_was_made_at_and_the_bill_prints_them(): void
     {
         $piece = $this->counterPiece();
-        $c = $this->toItems($piece)->call('next')->call('next');
+        $c = $this->toItems($piece)->call('next')->call('next')->call('next');
 
         $this->assertEqualsWithDelta(10933, collect($c->get('payments'))->sum(fn ($p) => (float) $p['amount']), 0.005, 'payment opens with the whole bill, GST included');
         $c->call('next')->call('submit')->assertHasNoErrors();
@@ -156,7 +156,7 @@ class GstTest extends TestCase
     public function test_a_bill_at_zero_gst_prints_no_gst_lines(): void
     {
         TaxSetting::current()->update(['jewellery_percent' => 0, 'hallmark_percent' => 0]);
-        $c = $this->toItems($this->counterPiece())->call('next')->call('next')->call('next')->call('submit')->assertHasNoErrors();
+        $c = $this->toItems($this->counterPiece())->call('next')->call('next')->call('next')->call('next')->call('submit')->assertHasNoErrors();
 
         $sale = Sale::where('customer_id', $this->customer->id)->latest('id')->firstOrFail();
         $this->assertEquals(10600, $sale->total);
@@ -167,18 +167,25 @@ class GstTest extends TestCase
 
     // ---------------------------------------------------------------- cheque
 
-    public function test_cheque_is_a_payment_mode_with_its_details_kept(): void
+    public function test_cash_and_bank_are_the_only_choices_for_a_new_payment_but_older_modes_still_read(): void
     {
-        $this->assertArrayHasKey('cheque', SalePayment::MODES);
+        $this->assertSame(['cash', 'bank'], array_keys(SalePayment::NEW_MODES));
+        foreach (['cheque', 'upi', 'card', 'exchange', 'advance'] as $older) {
+            $this->assertArrayHasKey($older, SalePayment::MODES, 'an older payment still has its label');
+        }
 
-        $c = $this->toItems($this->counterPiece())->call('next')->call('next');
-        $c->set('payments.0.mode', 'cheque')->set('payments.0.note', 'Cheque 000123, SBI')->assertSee('Cheque details');
-        $c->call('next')->call('submit')->assertHasNoErrors();
+        $c = $this->toItems($this->counterPiece())->call('next')->call('next')->call('next');
+        $c->assertSee('Cash')->assertSee('Bank')->assertDontSee('Cheque details');
+        $c->set('payments.0.mode', 'bank')->call('next')->call('submit')->assertHasNoErrors();
 
         $payment = SalePayment::whereHas('sale', fn ($q) => $q->where('customer_id', $this->customer->id))->firstOrFail();
-        $this->assertSame('cheque', $payment->mode);
-        $this->assertSame('Cheque 000123, SBI', $payment->note);
-        $this->get(route('sales.bill', $payment->sale))->assertOk()->assertSee('Paid by Cheque');
+        $this->assertSame('bank', $payment->mode);
+    }
+
+    public function test_a_payment_mode_that_does_not_exist_is_refused(): void
+    {
+        $c = $this->toItems($this->counterPiece())->call('next')->call('next')->call('next');
+        $c->set('payments.0.mode', 'barter')->call('next')->assertHasErrors('payments.0.amount');
     }
 
     // ---------------------------------------------------------------- the owner's settings and the other screens

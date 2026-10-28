@@ -68,7 +68,7 @@
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <x-ui.field label="Metal" for="oe-metal"><select id="oe-metal" wire:model.live="metal" class="rj-select"><option value="gold">Gold</option><option value="silver">Silver</option><option value="diamond">Diamond</option></select></x-ui.field>
                         <x-ui.field label="Subcategory" for="oe-cat" optional><select id="oe-cat" wire:model="category" class="rj-select"><option value="">Any</option>@foreach ($subcategories as $c)<option value="{{ $c->name }}">{{ $c->name }}</option>@endforeach</select></x-ui.field>
-                        <x-ui.field label="Estimated weight (g)" for="oe-w" error="estimatedWeight" optional><input id="oe-w" type="number" step="0.001" min="0" wire:model="estimatedWeight" class="rj-input tabular"></x-ui.field>
+                        <x-ui.field label="Estimated weight (g)" for="oe-w" error="estimatedWeight" optional><input id="oe-w" type="text" inputmode="decimal" autocomplete="off" wire:model="estimatedWeight" class="rj-input tabular"></x-ui.field>
                     </div>
                     <x-ui.field label="Expected ready by" for="oe-ready" error="expectedReadyDate" optional><input id="oe-ready" type="date" min="{{ today()->toDateString() }}" wire:model="expectedReadyDate" class="rj-input max-w-[220px]"></x-ui.field>
 
@@ -96,16 +96,16 @@
                         <span><span class="block text-[13.5px] font-semibold">Full payment now</span><span class="block text-[12.5px] text-ink_text-secondary">The metal rate is locked to today. Otherwise the rate on the day of delivery applies.</span></span>
                     </label>
                     @if ($fullPaymentNow)
-                        <x-ui.field label="Full value (₹)" for="oe-val" error="estimatedValue"><input id="oe-val" type="number" step="0.01" min="0" wire:model="estimatedValue" class="rj-input tabular max-w-[240px]"></x-ui.field>
+                        <x-ui.field label="Full value (₹)" for="oe-val" error="estimatedValue"><input id="oe-val" type="text" inputmode="decimal" autocomplete="off" wire:model="estimatedValue" class="rj-input tabular max-w-[240px]"></x-ui.field>
                     @else
-                        <x-ui.field label="Advance paid (₹)" for="oe-dep" error="depositAmount" optional><input id="oe-dep" type="number" step="0.01" min="0" wire:model="depositAmount" class="rj-input tabular max-w-[240px]"></x-ui.field>
+                        <x-ui.field label="Advance paid (₹)" for="oe-dep" error="depositAmount" optional><input id="oe-dep" type="text" inputmode="decimal" autocomplete="off" wire:model="depositAmount" class="rj-input tabular max-w-[240px]"></x-ui.field>
                     @endif
                     @if ($creditTotal > 0)
                         <div class="p-4 rounded-xl bg-gold-tint/50 ring-1 ring-inset ring-gold-soft/60 space-y-3">
                             <div class="text-[13px]"><strong>₹{{ number_format($creditTotal, 2) }}</strong> exchange credit is available for this customer.</div>
                             <div class="flex flex-wrap items-end gap-3">
                                 <x-ui.field label="Of the advance, from exchange credit (₹)" for="oe-credit" error="creditUse" optional>
-                                    <input id="oe-credit" type="number" step="0.01" min="0" wire:model="creditUse" class="rj-input tabular max-w-[240px]">
+                                    <input id="oe-credit" type="text" inputmode="decimal" autocomplete="off" wire:model="creditUse" class="rj-input tabular max-w-[240px]">
                                 </x-ui.field>
                                 <x-ui.button variant="secondary" size="sm" wire:click="useAllCredit">Use as much as I can</x-ui.button>
                             </div>

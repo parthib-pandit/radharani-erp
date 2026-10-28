@@ -61,7 +61,7 @@
         <x-ui.field label="Final value" for="av-final" error="finalValue" hint="The rupee amount to be paid or credited to the customer">
             <div class="relative">
                 <span class="absolute left-3 top-1/2 -translate-y-1/2 text-ink_text-muted text-[14px] font-semibold pointer-events-none">₹</span>
-                <input id="av-final" type="number" step="0.01" min="0" wire:model="finalValue" autofocus class="rj-input tabular pl-8">
+                <input id="av-final" type="text" inputmode="decimal" autocomplete="off" wire:model="finalValue" autofocus class="rj-input tabular pl-8">
             </div>
         </x-ui.field>
         <x-slot:footer>

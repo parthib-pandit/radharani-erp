@@ -87,13 +87,6 @@ class BoxDetail extends Component
         $this->dispatch('toast', message: $message, type: 'success');
     }
 
-    public function removePacket(int $packetId): void
-    {
-        $packet = Packet::where('box_id', $this->box->id)->findOrFail($packetId);
-        $packet->update(['box_id' => null]);
-        $this->dispatch('toast', message: "Packet {$packet->code} taken out of {$this->box->code}.", type: 'success');
-    }
-
     public function issueQr(): void
     {
         QrCode::forTarget('box', $this->box->id);
@@ -114,7 +107,6 @@ class BoxDetail extends Component
 
         return view('livewire.stock.box-detail', [
             'packets' => $packets,
-            'soldCount' => (clone $inside)->where('status', 'sold')->count(),
             'pieces' => (clone $items)->count(),
             'weight' => (float) (clone $items)->sum('weight'),
             'statusCounts' => (clone $items)->selectRaw('status, count(*) as c')->groupBy('status')->pluck('c', 'status'),

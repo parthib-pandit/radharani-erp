@@ -96,7 +96,7 @@ class ExchangeCreditTest extends TestCase
         $c = Livewire::withQueryParams(['exchange' => $tx->id])->test(NewSale::class);
         $this->assertSame($this->customer->id, $c->get('customerId'));
 
-        $c->call('addItem', $piece->id)->call('next')->call('next');
+        $c->call('addItem', $piece->id)->call('next')->call('next')->call('next');
         $this->assertSame(4, $c->get('step'));
 
         $lines = $c->get('payments');
@@ -122,7 +122,7 @@ class ExchangeCreditTest extends TestCase
         $tx = $this->settled(50000000);
         $piece = $this->counterPiece('XC002');
 
-        $c = Livewire::withQueryParams(['exchange' => $tx->id])->test(NewSale::class)->call('addItem', $piece->id)->call('next')->call('next');
+        $c = Livewire::withQueryParams(['exchange' => $tx->id])->test(NewSale::class)->call('addItem', $piece->id)->call('next')->call('next')->call('next');
         $total = $c->get('total');
 
         $this->assertEquals($total, $c->get('payments')[0]['amount']);
@@ -138,12 +138,12 @@ class ExchangeCreditTest extends TestCase
         $first = $this->counterPiece('XC003');
         $second = $this->counterPiece('XC004');
 
-        $a = Livewire::test(NewSale::class)->set('customerId', $this->customer->id)->call('next')->call('addItem', $first->id)->call('next')->call('next');
+        $a = Livewire::test(NewSale::class)->set('customerId', $this->customer->id)->call('addItem', $first->id)->call('next')->call('next')->call('next');
         $a->assertSee('exchange credit from exchange #' . $tx->id)->call('useCredit', $tx->id);
         $this->assertSame('exchange', collect($a->get('payments'))->firstWhere('exchange_id', $tx->id)['mode']);
 
         // A second sale is started before the first is saved; the first one saves and takes the credit.
-        $b = Livewire::test(NewSale::class)->set('customerId', $this->customer->id)->call('next')->call('addItem', $second->id)->call('next')->call('next')->call('useCredit', $tx->id);
+        $b = Livewire::test(NewSale::class)->set('customerId', $this->customer->id)->call('addItem', $second->id)->call('next')->call('next')->call('next')->call('useCredit', $tx->id);
         $a->call('next')->call('submit')->assertHasNoErrors();
         $this->assertEquals(0, $tx->fresh()->creditRemaining());
 
@@ -157,7 +157,7 @@ class ExchangeCreditTest extends TestCase
         $tx = $this->settled(1000, $other);
         $piece = $this->counterPiece('XC005');
 
-        $c = Livewire::test(NewSale::class)->set('customerId', $this->customer->id)->call('next')->call('addItem', $piece->id)->call('next')->call('next');
+        $c = Livewire::test(NewSale::class)->set('customerId', $this->customer->id)->call('addItem', $piece->id)->call('next')->call('next')->call('next');
         $c->set('payments', [['mode' => 'exchange', 'exchange_id' => $tx->id, 'amount' => '500']])->call('next')->assertHasErrors('payments.0.amount');
         $this->assertSame(0, SalePayment::where('exchange_transaction_id', $tx->id)->count());
     }
