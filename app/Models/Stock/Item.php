@@ -247,4 +247,52 @@ class Item extends Model
         return static::where('pair_group_id', $this->pair_group_id)
             ->where('id', '!=', $this->id);
     }
+
+    /** The other pieces tagged with this one (a pair, or a set of any size); empty for a single piece. */
+    public function mates()
+    {
+        return $this->pair_group_id
+            ? $this->pairedWith()->orderBy('id')->get()
+            : $this->newCollection();
+    }
+
+    /**
+     * Tags this piece with another (28 Oct): earrings, or any set that is kept together. A group is the shared pair_group_id.
+     * A single piece joins the other's group (or they start one); two pieces that already sit in different groups are refused,
+     * so unpair one first. Per-model updates, so every change lands in the pieces' history.
+     */
+    public function tagWith(self $other): void
+    {
+        if ($other->id === $this->id) {
+            throw new \InvalidArgumentException('A piece cannot be tagged with itself.');
+        }
+        if ($this->pair_group_id && $this->pair_group_id === $other->pair_group_id) {
+            return;
+        }
+        if ($this->pair_group_id && $other->pair_group_id) {
+            throw new \InvalidArgumentException("{$other->label} is already tagged with other pieces. Unpair one of them first.");
+        }
+
+        $group = $this->pair_group_id ?: $other->pair_group_id ?: min($this->id, $other->id);
+        foreach ([$this, $other] as $piece) {
+            if ($piece->pair_group_id !== $group) {
+                $piece->update(['pair_group_id' => $group]);
+            }
+        }
+    }
+
+    /** Takes this piece out of its group. A group left with one piece is dissolved, so nothing is "paired" with nothing. */
+    public function untag(): void
+    {
+        $group = $this->pair_group_id;
+        if (! $group) {
+            return;
+        }
+
+        $this->update(['pair_group_id' => null]);
+        $left = static::where('pair_group_id', $group)->get();
+        if ($left->count() === 1) {
+            $left->first()->update(['pair_group_id' => null]);
+        }
+    }
 }

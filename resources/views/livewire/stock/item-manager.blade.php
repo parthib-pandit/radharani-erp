@@ -125,7 +125,7 @@
                                 <x-ui.badge tone="gold" size="sm">HUID</x-ui.badge>
                             @endif
                             @if ($item->pair_group_id)
-                                <x-ui.badge size="sm" title="Part of a pair"><x-ui.icon name="link" :size="10" /> Pair</x-ui.badge>
+                                <x-ui.badge size="sm" title="Tagged with other pieces"><x-ui.icon name="link" :size="10" /> Pair</x-ui.badge>
                             @endif
                         </span>
                         <span class="block text-[12.5px] text-ink_text-muted truncate">{{ $item->description ?: 'No description' }}</span>

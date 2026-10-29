@@ -164,6 +164,11 @@ See `docs/REQUIREMENTS.md` for the full confirmed-requirements document this bui
 - **Taking a packet out of a box is done only in the Configurator** (Move to box, "Not in a box"); the box page no longer has it.
 - **Configurator shows 10 per column** with Load more, View all and Show fewer; the open box/packet always stays visible; a new search starts again from ten.
 
+## Tagging pieces together (29 October)
+
+- **A piece can be tagged with another from its own page** (earrings, or a set of any size): "Tag with another piece" opens a scan/search modal (`ItemDetail::pairWith()`), "Unpair" leaves the group. The group is still the shared `items.pair_group_id`; the logic is `Item::tagWith()` / `untag()` / `mates()` and the Add/Edit Item form uses the same methods. Always tag through them (per-model updates keep the history).
+- Rules: a single piece may join someone else's group; two pieces already in different groups are refused until one is unpaired; a group left with one piece is dissolved; sold pieces cannot be tagged. The history shows "Linked as a pair" / "Pair removed". Tagging does not make the pieces act together in sales or movements.
+
 ## Conventions added with the 8 October change list
 
 - **Batches are identified by date and time.** Karigar issues (`karigar_raw_batches`), hallmark dispatches (`hallmark_batches`), imports (`entry_batches`) and raw-material purchases show `label` (`j M Y, g:i a`). Part receipts (`karigar_receipts`, `hallmark_receipts`) are insert-only; the owner or manager closes what has not come back, with a note.

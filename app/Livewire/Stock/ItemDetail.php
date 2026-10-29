@@ -19,6 +19,9 @@ class ItemDetail extends Component
     public ?string $moveBox = null; // narrows the packet list to one box
     public ?string $moveScanError = null;
 
+    public bool $showPair = false;
+    public string $pairSearch = '';
+
     public function mount(Item $item): void
     {
         $this->item = $item;
@@ -71,6 +74,43 @@ class ItemDetail extends Component
         $this->dispatch('toast', message: "{$this->item->label} moved to {$where}.", type: 'success');
     }
 
+    // Tag this piece with another (earrings, or a set kept together): scan or search, then pick.
+    public function openPair(): void
+    {
+        $this->pairSearch = '';
+        $this->showPair = true;
+    }
+
+    public function pairWith(int $otherId): void
+    {
+        $other = Item::where('status', '!=', 'sold')->find($otherId);
+        if (! $other || $other->id === $this->item->id) {
+            $this->dispatch('toast', message: 'That piece cannot be tagged.', type: 'error');
+
+            return;
+        }
+
+        try {
+            $this->item->tagWith($other);
+        } catch (\InvalidArgumentException $e) {
+            $this->dispatch('toast', message: $e->getMessage(), type: 'error');
+
+            return;
+        }
+
+        $this->item->refresh();
+        $this->showPair = false;
+        $this->dispatch('toast', message: "{$this->item->label} is tagged with {$other->label}.", type: 'success');
+    }
+
+    // Leaves the group; the others stay together unless only one would be left.
+    public function unpair(): void
+    {
+        $this->item->untag();
+        $this->item->refresh();
+        $this->dispatch('toast', message: "{$this->item->label} is no longer tagged with other pieces.", type: 'success');
+    }
+
     // Soft delete: hidden everywhere, kept in the audit trail.
     public function deleteItem()
     {
@@ -95,6 +135,19 @@ class ItemDetail extends Component
         $this->dispatch('toast', message: 'QR label issued. Print it from the panel.', type: 'success');
     }
 
+    // Pieces this one can be tagged with: not itself, not sold. A piece already in a group can only take unpaired pieces;
+    // a single piece may also join a group someone else has started. With nothing typed: unpaired pieces of the same category.
+    private function pairCandidates()
+    {
+        $term = trim($this->pairSearch);
+
+        return Item::query()
+            ->where('id', '!=', $this->item->id)->where('status', '!=', 'sold')
+            ->when($this->item->pair_group_id || $term === '', fn ($q) => $q->whereNull('pair_group_id'))
+            ->when($term === '', fn ($q) => $q->where('category', $this->item->category), fn ($q) => $q->searchAnything($term))
+            ->orderByDesc('id')->limit(15)->get();
+    }
+
     public function render(StockHistoryService $history, PricingService $pricing)
     {
         $this->item->load('packet.box', 'sourcePurchaseItem.purchase.vendor', 'sourceKarigarBatch');
@@ -106,7 +159,8 @@ class ItemDetail extends Component
 
         return view('livewire.stock.item-detail', [
             'events' => $history->forItem($this->item),
-            'pair' => $this->item->pair_group_id ? $this->item->pairedWith()->first() : null,
+            'mates' => $mates = $this->item->mates(),
+            'pairCandidates' => $this->showPair ? $this->pairCandidates() : collect(),
             'price' => $price = $this->item->status === 'sold' ? null : $pricing->breakdown($this->item),
             'gst' => $price ? $pricing->gstOnItem($price, ...$pricing->gstRates()) + ['rates' => $pricing->gstRates()] : null,
             'sale' => $sale,

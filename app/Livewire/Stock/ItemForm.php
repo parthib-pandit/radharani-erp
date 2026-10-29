@@ -505,10 +505,9 @@ class ItemForm extends Component
             return;
         }
 
-        // Pairing changed on an edit: detach from the old partner first.
+        // Pairing changed on an edit: leave the old group first (a group left with one piece is dissolved).
         if ($this->editingId && $this->currentPairId) {
-            Item::whereKey($this->currentPairId)->first()?->update(['pair_group_id' => null]);
-            $item->update(['pair_group_id' => null]);
+            $item->untag();
         }
 
         if ($this->pairMode === 'new') {
@@ -523,10 +522,7 @@ class ItemForm extends Component
         }
 
         if ($this->pairMode === 'existing' && $this->pairWithId && $this->pairWithId !== $item->id) {
-            $other = Item::findOrFail($this->pairWithId);
-            $group = $other->pair_group_id ?: min($other->id, $item->id);
-            $other->update(['pair_group_id' => $group]);
-            $item->update(['pair_group_id' => $group]);
+            $item->tagWith(Item::findOrFail($this->pairWithId));
         }
     }
 

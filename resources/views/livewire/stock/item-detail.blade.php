@@ -24,8 +24,8 @@
             @else
                 <x-ui.badge size="lg">Internal code</x-ui.badge>
             @endif
-            @if ($pair)
-                <x-ui.badge size="lg"><x-ui.icon name="link" :size="12" /> Pair</x-ui.badge>
+            @if ($mates->isNotEmpty())
+                <x-ui.badge size="lg"><x-ui.icon name="link" :size="12" /> {{ $mates->count() === 1 ? 'Pair' : 'Set of ' . ($mates->count() + 1) }}</x-ui.badge>
             @endif
         </x-slot:meta>
         <x-slot:actions>
@@ -169,13 +169,24 @@
                     <div class="col-span-2">
                         <dt>Paired with</dt>
                         <dd>
-                            @if ($pair)
-                                <a href="{{ route('stock.items.show', $pair) }}" class="rj-code">{{ $pair->label }}</a>
-                                <span class="text-ink_text-muted tabular">· {{ number_format($pair->weight, 3) }} g ·</span>
-                                <x-ui.status :status="$pair->status" size="sm" />
-                            @else
+                            @forelse ($mates as $mate)
+                                <div wire:key="mate-{{ $mate->id }}" class="flex flex-wrap items-center gap-x-1.5">
+                                    <a href="{{ route('stock.items.show', $mate) }}" class="rj-code">{{ $mate->label }}</a>
+                                    <span class="text-ink_text-muted tabular">· {{ number_format($mate->weight, 3) }} g ·</span>
+                                    <x-ui.status :status="$mate->status" size="sm" />
+                                </div>
+                            @empty
                                 <span class="text-ink_text-muted">Single piece</span>
-                            @endif
+                            @endforelse
+                            <div class="mt-1.5 flex items-center gap-3 text-[12.5px]">
+                                @if ($item->status !== 'sold')
+                                    <button type="button" wire:click="openPair" class="font-semibold text-gold-dark hover:underline">{{ $mates->isNotEmpty() ? 'Tag with another piece' : 'Tag with another piece (earrings, sets)' }}</button>
+                                @endif
+                                @if ($mates->isNotEmpty())
+                                    <button type="button" class="font-semibold text-danger hover:underline"
+                                        x-on:click="$dispatch('rj-confirm', { title: 'Unpair {{ $item->label }}?', message: 'It stays in stock, it is just no longer tagged with {{ $mates->count() === 1 ? $mates->first()->label : 'the others' }}.', confirm: 'Unpair', tone: 'danger', action: () => $wire.unpair() })">Unpair</button>
+                                @endif
+                            </div>
                         </dd>
                     </div>
                     @if ($item->sourcePurchaseItem)
@@ -193,6 +204,29 @@
     </div>
 
     <livewire:stock.item-form />
+
+    <x-ui.modal wire:model="showPair" title="Tag {{ $item->label }} with another piece" icon="link" max-width="md"
+        subtitle="Scan or search the other piece. Pieces tagged together show on each other's page.">
+        <x-ui.search-input scan wire:model.live.debounce.300ms="pairSearch" placeholder="Scan or type a HUID, code or category" class="mb-3" autofocus />
+        <div class="border border-line-light rounded-xl max-h-[280px] overflow-y-auto divide-y divide-line-light">
+            @forelse ($pairCandidates as $pc)
+                <div wire:key="pc-{{ $pc->id }}" class="flex items-center gap-3 px-3.5 py-2.5">
+                    <div class="flex-1 min-w-0">
+                        <span class="rj-code text-ink_text-primary">{{ $pc->label }}</span>
+                        @if ($pc->pair_group_id)<x-ui.badge size="sm" class="ml-1">Already tagged</x-ui.badge>@endif
+                        <span class="block text-[12.5px] text-ink_text-secondary truncate">{{ $pc->category }} · {{ ucfirst($pc->metal ?? '') }} {{ $pc->purity }} · {{ number_format($pc->weight, 3) }} g</span>
+                    </div>
+                    <x-ui.button size="sm" variant="secondary" wire:click="pairWith({{ $pc->id }})" target="pairWith({{ $pc->id }})">Tag</x-ui.button>
+                </div>
+            @empty
+                <div class="px-4 py-6 text-center text-[12.5px] text-ink_text-muted">{{ trim($pairSearch) === '' ? 'No unpaired piece of the same category. Scan or type to look further.' : 'No piece matches.' }}</div>
+            @endforelse
+        </div>
+        <x-slot:footer>
+            <x-ui.button variant="secondary" x-on:click="show = false">Close</x-ui.button>
+        </x-slot:footer>
+    </x-ui.modal>
+
 
     <x-ui.modal wire:model="showMove" title="Move {{ $item->label }}" icon="package" max-width="sm" submit="move" subtitle="The move is recorded in the piece's and both packets' history.">
         <div class="mb-4">
